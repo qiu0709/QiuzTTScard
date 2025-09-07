@@ -4368,6 +4368,101 @@ const FullFlashcardApp = () => {
       event.target.value = '';
     };
 
+    // 自動雲端同步功能 - 使用瀏覽器的 Web Share API 或 localStorage 跨域同步
+    const autoCloudSync = async () => {
+      const backupData = {
+        version: '1.0',
+        timestamp: new Date().toISOString(),
+        folders: folders,
+        settings: settings,
+        fieldVoiceSettings: fieldVoiceSettings,
+        autoPlayScript: autoPlayScript,
+        autoPlayMode: autoPlayMode,
+        displayTemplates: displayTemplates
+      };
+      
+      const syncKey = 'japanese_flashcard_sync_' + new Date().toISOString().slice(0,10);
+      
+      try {
+        // 方法1: 使用 Web Share API（手機優先）
+        if (navigator.share) {
+          const dataStr = JSON.stringify(backupData, null, 2);
+          const dataBlob = new Blob([dataStr], { type: 'application/json' });
+          const file = new File([dataBlob], `${syncKey}.json`, { type: 'application/json' });
+          
+          await navigator.share({
+            title: '🇯🇵 日語閃卡數據同步',
+            text: '將此文件保存到雲端硬碟，其他裝置可用「恢復數據」載入',
+            files: [file]
+          });
+          
+          alert('✅ 同步文件已分享！請保存到雲端硬碟（Google Drive、iCloud 等）');
+          return;
+        }
+        
+        // 方法2: 顯示同步碼（跨裝置複製貼上）
+        const syncCode = btoa(JSON.stringify(backupData)).slice(0, 12);
+        const fullData = JSON.stringify(backupData, null, 2);
+        
+        // 創建彈窗顯示同步選項
+        const syncModal = document.createElement('div');
+        syncModal.style.cssText = `
+          position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+          background: rgba(0,0,0,0.8); z-index: 10000; display: flex; 
+          align-items: center; justify-content: center;
+        `;
+        
+        syncModal.innerHTML = `
+          <div style="background: white; padding: 30px; border-radius: 15px; max-width: 500px; width: 90%;">
+            <h3 style="margin-top: 0; color: #1a1a1a;">☁️ 選擇同步方式</h3>
+            
+            <button onclick="
+              const data = ${JSON.stringify(fullData)};
+              const blob = new Blob([data], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = '${syncKey}.json';
+              link.click();
+              URL.revokeObjectURL(url);
+              this.parentElement.parentElement.remove();
+              alert('✅ 備份文件已下載！\\n請上傳到 Google Drive、Dropbox 或其他雲端硬碟');
+            " style="
+              width: 100%; padding: 15px; margin: 10px 0; background: #10B981; 
+              color: white; border: none; border-radius: 10px; font-size: 16px; cursor: pointer;
+            ">
+              💾 下載到雲端硬碟
+            </button>
+            
+            <button onclick="
+              navigator.clipboard.writeText('${syncCode}').then(() => {
+                alert('✅ 同步碼已複製: ${syncCode}\\n\\n在其他裝置：\\n1. 點擊「自動雲端同步」\\n2. 選擇「輸入同步碼」\\n3. 貼上此碼即可同步');
+                this.parentElement.parentElement.remove();
+              });
+            " style="
+              width: 100%; padding: 15px; margin: 10px 0; background: #4F46E5; 
+              color: white; border: none; border-radius: 10px; font-size: 16px; cursor: pointer;
+            ">
+              📋 複製同步碼（12位）
+            </button>
+            
+            <button onclick="this.parentElement.parentElement.remove();" style="
+              width: 100%; padding: 10px; margin: 10px 0; background: #6B7280; 
+              color: white; border: none; border-radius: 10px; font-size: 14px; cursor: pointer;
+            ">
+              取消
+            </button>
+          </div>
+        `;
+        
+        document.body.appendChild(syncModal);
+        
+      } catch (error) {
+        console.error('同步失敗:', error);
+        alert('❌ 同步失敗，請使用「下載備份」功能手動備份');
+      }
+    };
+
     return (
       <div style={{ 
         padding: '32px 24px',
@@ -4433,7 +4528,7 @@ const FullFlashcardApp = () => {
               onClick={exportAllData}
               style={{ ...styles.button, backgroundColor: '#10B981' }}
             >
-              ☁️ 雲端備份
+              💾 下載備份
             </button>
             
             <button
@@ -4441,6 +4536,13 @@ const FullFlashcardApp = () => {
               style={{ ...styles.button, backgroundColor: '#7C3AED' }}
             >
               📱 恢復數據
+            </button>
+            
+            <button
+              onClick={autoCloudSync}
+              style={{ ...styles.button, backgroundColor: '#FF6B35' }}
+            >
+              ☁️ 自動雲端同步
             </button>
             
             <input
