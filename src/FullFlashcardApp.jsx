@@ -4864,7 +4864,8 @@ const FullFlashcardApp = () => {
                   display: 'flex', 
                   flexDirection: 'column',
                   overflow: 'hidden',
-                  gap: '10px'
+                  gap: '10px',
+                  maxHeight: '80vh'
                 }}>
                   {/* 固定頭部區域 */}
                   <div style={{ 
@@ -4926,7 +4927,7 @@ const FullFlashcardApp = () => {
                     padding: '15px',
                     marginBottom: '10px',
                     minHeight: 0,
-                    maxHeight: 'calc(100vh - 450px)'
+                    maxHeight: '600px'
                   }}>
                       {autoPlayScript.map((step, index) => (
                         <div 
@@ -6161,7 +6162,14 @@ const FullFlashcardApp = () => {
                   </p>
                 </div>
                 
-                <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
+                <div style={{ 
+                  maxHeight: '400px', 
+                  overflowY: 'auto',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '6px',
+                  padding: '10px',
+                  backgroundColor: '#fefefe'
+                }}>
                   <h5 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '10px' }}>腳本流程預覽</h5>
                   {autoPlayScript.map((step, index) => (
                     <div key={step.id} style={{ 
