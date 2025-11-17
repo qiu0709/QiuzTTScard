@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>測試 .apkg 匯入</title>
+</head>
+<body>
+  <h1>測試 .apkg 匯入功能</h1>
+
+  <input type="file" id="apkgFile" accept=".apkg">
+  <button onclick="testImport()">開始測試</button>
+
+  <div id="output" style="margin-top: 20px; padding: 20px; background: #f5f5f5; border-radius: 8px;">
+    <h3>輸出:</h3>
+    <pre id="result" style="white-space: pre-wrap; word-wrap: break-word;"></pre>
+  </div>
+
+  <script type="module">
+    import JSZip from 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm';
+    import initSqlJs from 'https://cdn.jsdelivr.net/npm/sql.js@1.13.0/+esm';
+
+    window.testImport = async function() {
+      const fileInput = document.getElementById('apkgFile');
+      const resultDiv = document.getElementById('result');
+      const file = fileInput.files[0];
+
+      if (!file) {
+        resultDiv.textContent = '請先選擇檔案!';
+        return;
+      }
+
+      resultDiv.textContent = '開始解析...\n';
+
+      try {
+        // 1. 讀取檔案
+        resultDiv.textContent += `檔案名稱: ${file.name}\n`;
+        resultDiv.textContent += `檔案大小: ${file.size} bytes\n\n`;
+
+        // 2. 解壓 ZIP
+        const zip = await JSZip.loadAsync(file);
+        resultDiv.textContent += 'ZIP 解壓成功!\n';
+        resultDiv.textContent += `檔案列表: ${Object.keys(zip.files).join(', ')}\n\n`;
+
+        // 3. 找到資料庫
+        let collectionFile = zip.file('collection.anki21');
+        if (!collectionFile) {
+          collectionFile = zip.file('collection.anki2');
+        }
+
+        if (!collectionFile) {
+          resultDiv.textContent += '錯誤: 找不到 collection.anki21 或 collection.anki2\n';
+          return;
+        }
+
+        resultDiv.textContent += `找到資料庫: ${collectionFile.name}\n\n`;
+
+        // 4. 載入資料庫
+        const dbData = await collectionFile.async('arraybuffer');
+        resultDiv.textContent += `資料庫大小: ${dbData.byteLength} bytes\n\n`;
+
+        // 5. 初始化 SQL.js
+        resultDiv.textContent += '初始化 SQL.js...\n';
+        const SQL = await initSqlJs({
+          locateFile: file => `https://sql.js.org/dist/${file}`
+        });
+        resultDiv.textContent += 'SQL.js 初始化成功!\n\n';
+
+        // 6. 開啟資料庫
+        const db = new SQL.Database(new Uint8Array(dbData));
+        resultDiv.textContent += '資料庫開啟成功!\n\n';
+
+        // 7. 查詢卡片
+        resultDiv.textContent += '查詢卡片...\n';
+        const query = db.exec('SELECT id, flds FROM notes LIMIT 3');
+
+        if (!query.length || !query[0].values.length) {
+          resultDiv.textContent += '錯誤: 沒有找到卡片\n';
+          return;
+        }
+
+        resultDiv.textContent += `找到 ${query[0].values.length} 張卡片 (顯示前3張)\n\n`;
+
+        // 8. 顯示卡片內容
+        query[0].values.forEach(([id, flds], index) => {
+          const fieldValues = flds.split('\x1f');
+          resultDiv.textContent += `卡片 ${index + 1} (ID: ${id}):\n`;
+          resultDiv.textContent += `  欄位數量: ${fieldValues.length}\n`;
+          fieldValues.forEach((val, i) => {
+            const preview = val.length > 50 ? val.substring(0, 50) + '...' : val;
+            resultDiv.textContent += `  欄位 ${i + 1}: ${preview}\n`;
+          });
+          resultDiv.textContent += '\n';
+        });
+
+        // 9. 統計總數
+        const countQuery = db.exec('SELECT COUNT(*) FROM notes');
+        const totalCards = countQuery[0].values[0][0];
+        resultDiv.textContent += `\n總共有 ${totalCards} 張卡片\n`;
+
+        db.close();
+        resultDiv.textContent += '\n✅ 測試成功!';
+
+      } catch (error) {
+        resultDiv.textContent += `\n❌ 錯誤: ${error.message}\n`;
+        resultDiv.textContent += `堆疊追蹤:\n${error.stack}\n`;
+      }
+    }
+  </script>
+</body>
+</html>

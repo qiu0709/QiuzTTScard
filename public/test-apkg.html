@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>測試 .apkg 匯入</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      max-width: 1200px;
+      margin: 40px auto;
+      padding: 20px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      background: #4F46E5;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      margin: 10px 5px;
+    }
+    button:hover {
+      background: #4338CA;
+    }
+    #output {
+      margin-top: 20px;
+      padding: 20px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+    }
+    #result {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-family: monospace;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .success { color: #10b981; }
+    .error { color: #ef4444; }
+    .info { color: #3b82f6; }
+  </style>
+</head>
+<body>
+  <h1>測試 .apkg 匯入功能</h1>
+
+  <div>
+    <input type="file" id="apkgFile" accept=".apkg">
+    <button onclick="testImport()">開始測試</button>
+  </div>
+
+  <div id="output">
+    <h3>輸出:</h3>
+    <pre id="result">等待測試...</pre>
+  </div>
+
+  <script>
+    // 使用全域函數,不用 module
+    function log(msg, type = 'info') {
+      const resultDiv = document.getElementById('result');
+      const span = document.createElement('span');
+      span.className = type;
+      span.textContent = msg + '\n';
+      resultDiv.appendChild(document.createTextNode(msg + '\n'));
+      console.log(msg);
+    }
+
+    function clearLog() {
+      document.getElementById('result').textContent = '';
+    }
+
+    async function testImport() {
+      clearLog();
+      const fileInput = document.getElementById('apkgFile');
+      const file = fileInput.files[0];
+
+      if (!file) {
+        log('❌ 請先選擇檔案!', 'error');
+        return;
+      }
+
+      log('=== 開始測試 ===', 'info');
+      log(`檔案名稱: ${file.name}`);
+      log(`檔案大小: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
+      log('');
+
+      try {
+        // 動態載入 JSZip
+        log('載入 JSZip...');
+        const JSZip = (await import('/node_modules/jszip/dist/jszip.min.js')).default;
+        log('✅ JSZip 載入成功');
+
+        // 解壓 ZIP
+        log('');
+        log('解壓 ZIP 檔案...');
+        const zip = await JSZip.loadAsync(file);
+        log('✅ ZIP 解壓成功');
+
+        const fileList = Object.keys(zip.files).slice(0, 10);
+        log(`檔案數量: ${Object.keys(zip.files).length}`);
+        log(`前10個檔案: ${fileList.join(', ')}`);
+
+        // 找到資料庫
+        log('');
+        log('尋找資料庫檔案...');
+        let collectionFile = zip.file('collection.anki21');
+        if (!collectionFile) {
+          collectionFile = zip.file('collection.anki2');
+        }
+
+        if (!collectionFile) {
+          log('❌ 找不到 collection.anki21 或 collection.anki2', 'error');
+          return;
+        }
+
+        log(`✅ 找到資料庫: ${collectionFile.name}`, 'success');
+
+        // 載入資料庫
+        log('');
+        log('讀取資料庫內容...');
+        const dbData = await collectionFile.async('arraybuffer');
+        log(`✅ 資料庫大小: ${(dbData.byteLength / 1024 / 1024).toFixed(2)} MB`);
+
+        // 初始化 SQL.js
+        log('');
+        log('初始化 SQL.js...');
+        const initSqlJs = (await import('/node_modules/sql.js/dist/sql-wasm.js')).default;
+        const SQL = await initSqlJs({
+          locateFile: file => `/node_modules/sql.js/dist/${file}`
+        });
+        log('✅ SQL.js 初始化成功', 'success');
+
+        // 開啟資料庫
+        log('');
+        log('開啟 SQLite 資料庫...');
+        const db = new SQL.Database(new Uint8Array(dbData));
+        log('✅ 資料庫開啟成功', 'success');
+
+        // 查詢卡片總數
+        log('');
+        log('查詢卡片總數...');
+        const countQuery = db.exec('SELECT COUNT(*) FROM notes');
+        const totalCards = countQuery[0].values[0][0];
+        log(`✅ 總共有 ${totalCards} 張卡片`, 'success');
+
+        // 查詢前3張卡片
+        log('');
+        log('查詢前3張卡片內容...');
+        const query = db.exec('SELECT id, flds FROM notes LIMIT 3');
+
+        if (!query.length || !query[0].values.length) {
+          log('❌ 沒有找到卡片', 'error');
+          return;
+        }
+
+        query[0].values.forEach(([id, flds], index) => {
+          const fieldValues = flds.split('\x1f');
+          log('');
+          log(`--- 卡片 ${index + 1} (ID: ${id}) ---`);
+          log(`  欄位數量: ${fieldValues.length}`);
+          fieldValues.forEach((val, i) => {
+            const preview = val.length > 80 ? val.substring(0, 80) + '...' : val;
+            log(`  欄位 ${i + 1}: ${preview}`);
+          });
+        });
+
+        db.close();
+
+        log('');
+        log('=== ✅ 測試成功! ===', 'success');
+
+      } catch (error) {
+        log('');
+        log(`=== ❌ 錯誤 ===`, 'error');
+        log(`錯誤訊息: ${error.message}`, 'error');
+        log(`錯誤堆疊:\n${error.stack}`, 'error');
+        console.error('完整錯誤:', error);
+      }
+    }
+
+    // 頁面載入完成後的提示
+    window.addEventListener('load', () => {
+      console.log('測試頁面已載入');
+      document.getElementById('result').textContent = '請選擇 .apkg 檔案,然後點擊「開始測試」按鈕。';
+    });
+  </script>
+</body>
+</html>

@@ -5,7 +5,11 @@
       "Bash(npm run build:*)",
       "Bash(npm install:*)",
       "Bash(vercel:*)",
-      "Bash(open https://vercel.com/new)"
+      "Bash(open https://vercel.com/new)",
+      "Bash(npm i:*)",
+      "Bash(sqlite3:*)",
+      "Bash(npm run dev:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

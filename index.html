@@ -2,12 +2,98 @@
 <html lang="zh-TW">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>日本語学習カード</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>單字閃卡 - 日文學習</title>
+
+    <!-- PWA Meta Tags -->
+    <meta name="description" content="日文單字學習閃卡應用程式，支援 Anki 匯入和 Azure TTS 語音播放" />
+    <meta name="theme-color" content="#4F46E5" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="單字閃卡" />
+
+    <!-- iOS Splash Screens -->
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <link rel="apple-touch-startup-image" href="/icon-512.png" />
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/icon-192.png" />
+
     <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Responsive CSS -->
+    <style>
+      /* 基礎響應式設定 */
+      * {
+        -webkit-tap-highlight-color: transparent;
+        -webkit-touch-callout: none;
+      }
+
+      body {
+        overscroll-behavior: none;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      /* 手機版按鈕最小尺寸 */
+      @media (max-width: 768px) {
+        button {
+          min-height: 44px !important;
+          min-width: 44px !important;
+          font-size: 16px !important;
+        }
+
+        input, select, textarea {
+          font-size: 16px !important; /* 防止 iOS 自動縮放 */
+        }
+      }
+
+      /* 防止雙擊縮放 */
+      button, a {
+        touch-action: manipulation;
+      }
+
+      /* iOS 安全區域適配 */
+      body {
+        padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+
+    <!-- Service Worker 註冊 -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/service-worker.js')
+            .then((registration) => {
+              console.log('✅ Service Worker 註冊成功:', registration.scope);
+            })
+            .catch((error) => {
+              console.log('❌ Service Worker 註冊失敗:', error);
+            });
+        });
+      }
+
+      // PWA 安裝提示
+      let deferredPrompt;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        console.log('💡 PWA 可以安裝到桌面');
+
+        // 可以在這裡顯示自定義的安裝提示
+        // 目前先在 console 顯示
+      });
+
+      window.addEventListener('appinstalled', () => {
+        console.log('✅ PWA 已安裝到桌面');
+        deferredPrompt = null;
+      });
+    </script>
   </body>
 </html>

@@ -1,4 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import DesignEditor from './components/DesignEditor.jsx';
+import TableViewCard from './components/TableViewCard.jsx';
+import ClickableWrapper from './components/ClickableWrapper.jsx';
+import { parseApkgFile, convertToAppFormat } from './utils/apkgImporter.js';
 
 const FullFlashcardApp = () => {
   const [folders, setFolders] = useState([]);
@@ -10,13 +14,43 @@ const FullFlashcardApp = () => {
   const [showSpreadsheet, setShowSpreadsheet] = useState(false);
   const [showFieldEditor, setShowFieldEditor] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [showFieldSelector, setShowFieldSelector] = useState(false);
+  const [apkgPreviewData, setApkgPreviewData] = useState(null);
+  const [importMode, setImportMode] = useState('replace'); // 匯入模式: 'replace'(建立新資料夾) 或 'append'(附加到現有)
   const [showTTSSettings, setShowTTSSettings] = useState(false);
   const [showVoiceStyleEditor, setShowVoiceStyleEditor] = useState(false);
   const [editingFieldKey, setEditingFieldKey] = useState(null);
   // showGlobalTemplateEditor 已移除，模板編輯整合至播放設定頁面
   const [showAutoPlayEditor, setShowAutoPlayEditor] = useState(false);
-  const [currentPlaySettingTab, setCurrentPlaySettingTab] = useState('script'); // 'script' | 'pages' | 'voice'
-  
+  const [currentPlaySettingTab, setCurrentPlaySettingTab] = useState('script'); // 'script' | 'pages'
+  const [designMode, setDesignMode] = useState(false); // 設計模式開關
+  const [selectedElement, setSelectedElement] = useState(null); // 當前選中的元素
+  const [customStyles, setCustomStyles] = useState({}); // 自定義樣式
+  const [cardDisplayMode, setCardDisplayMode] = useState('card'); // 'card' | 'table' - 卡片顯示模式
+  const [showGroupDialog, setShowGroupDialog] = useState(false); // 顯示分組對話框
+  const [selectedSubFolders, setSelectedSubFolders] = useState([]); // 選中要播放的子資料夾
+  const [showSyncDialog, setShowSyncDialog] = useState(false); // 顯示同步對話框
+  const [syncSettings, setSyncSettings] = useState({
+    githubToken: '',
+    gistId: '',
+    autoSync: false,
+    lastSyncTime: null
+  }); // 雲端同步設定
+
+  // 檢測是否為手機裝置
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   // 語音設定狀態 - 為每個欄位設定Azure語音、速度、風格
   const [fieldVoiceSettings, setFieldVoiceSettings] = useState({
     kanji: {
@@ -55,17 +89,28 @@ const FullFlashcardApp = () => {
   const AZURE_VOICES = {
     'zh-TW': [
       { value: 'zh-TW-HsiaoChenNeural', label: '曉臻 (女性, 溫柔)' },
+      { value: 'zh-TW-HsiaoYuNeural', label: '曉宇 (女性, 活潑)' },
       { value: 'zh-TW-YunJheNeural', label: '雲哲 (男性, 穩重)' },
-      { value: 'zh-TW-HsiaoYuNeural', label: '曉宇 (女性, 活潑)' }
+      { value: 'zh-TW-YunHsiNeural', label: '雲曦 (男性, 溫和)' }
     ],
     'ja-JP': [
       { value: 'ja-JP-NanamiNeural', label: 'Nanami (女性, 標準)' },
+      { value: 'ja-JP-AoiNeural', label: 'Aoi (女性, 溫柔)' },
+      { value: 'ja-JP-MayuNeural', label: 'Mayu (女性, 活潑)' },
+      { value: 'ja-JP-ShioriNeural', label: 'Shiori (女性, 成熟)' },
       { value: 'ja-JP-KeitaNeural', label: 'Keita (男性, 標準)' },
-      { value: 'ja-JP-AoiNeural', label: 'Aoi (女性, 溫柔)' }
+      { value: 'ja-JP-DaichiNeural', label: 'Daichi (男性, 穩重)' },
+      { value: 'ja-JP-NaokiNeural', label: 'Naoki (男性, 活力)' }
     ],
     'en-US': [
       { value: 'en-US-AriaNeural', label: 'Aria (女性, 標準)' },
-      { value: 'en-US-GuyNeural', label: 'Guy (男性, 標準)' }
+      { value: 'en-US-JennyNeural', label: 'Jenny (女性, 專業)' },
+      { value: 'en-US-GuyNeural', label: 'Guy (男性, 標準)' },
+      { value: 'en-US-DavisNeural', label: 'Davis (男性, 穩重)' },
+      { value: 'en-US-TonyNeural', label: 'Tony (男性, 成熟)' },
+      { value: 'en-US-JasonNeural', label: 'Jason (男性, 活力)' },
+      { value: 'en-US-SaraNeural', label: 'Sara (女性, 溫柔)' },
+      { value: 'en-US-NancyNeural', label: 'Nancy (女性, 活潑)' }
     ]
   };
 
@@ -167,11 +212,41 @@ const FullFlashcardApp = () => {
   
   // 顯示模板管理
   const [displayTemplates, setDisplayTemplates] = useState({
-    A: { name: '純漢字', fields: ['kanji', 'meaning'], showFurigana: false },
-    B: { name: '漢字+注音', fields: ['kanji', 'hiragana'], showFurigana: true },
-    C: { name: '例句', fields: ['example'], showFurigana: true },
-    D: { name: '詳細信息', fields: ['kanji', 'meaning', 'level'], showFurigana: false },
-    E: { name: '完整顯示', fields: ['kanji', 'hiragana', 'meaning', 'example'], showFurigana: true }
+    A: {
+      name: '純漢字',
+      fields: ['kanji', 'meaning'],
+      showFurigana: false,
+      fieldStyles: {}, // 欄位樣式設定：{ fieldKey: { fontSize, fontFamily, textAlign } }
+      topFields: [] // 頁面頂部顯示的欄位（最多3個）
+    },
+    B: {
+      name: '漢字+注音',
+      fields: ['kanji', 'hiragana'],
+      showFurigana: true,
+      fieldStyles: {},
+      topFields: []
+    },
+    C: {
+      name: '例句',
+      fields: ['example'],
+      showFurigana: true,
+      fieldStyles: {},
+      topFields: []
+    },
+    D: {
+      name: '詳細信息',
+      fields: ['kanji', 'meaning', 'level'],
+      showFurigana: false,
+      fieldStyles: {},
+      topFields: []
+    },
+    E: {
+      name: '完整顯示',
+      fields: ['kanji', 'hiragana', 'meaning', 'example'],
+      showFurigana: true,
+      fieldStyles: {},
+      topFields: []
+    }
   });
   const [showTemplateEditor, setShowTemplateEditor] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
@@ -181,9 +256,9 @@ const FullFlashcardApp = () => {
     defaultRate: 1.0,
     showFurigana: true,
     azureTTS: {
-      enabled: false,
-      subscriptionKey: '',
-      region: 'eastus',
+      enabled: import.meta.env.VITE_AZURE_SPEECH_KEY ? true : false,
+      subscriptionKey: import.meta.env.VITE_AZURE_SPEECH_KEY || '',
+      region: import.meta.env.VITE_AZURE_SPEECH_REGION || 'eastasia',
       defaultVoice: 'ja-JP-NanamiNeural'
     }
   });
@@ -365,29 +440,32 @@ const FullFlashcardApp = () => {
       minHeight: '100vh',
       backgroundColor: '#fafafa',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-      color: '#333333'
+      color: '#333333',
+      padding: isMobile ? '10px' : '20px'
     },
     header: {
-      fontSize: '28px',
+      fontSize: isMobile ? '20px' : '28px',
       fontWeight: '600',
       color: '#1a1a1a',
-      marginBottom: '24px',
+      marginBottom: isMobile ? '16px' : '24px',
       display: 'flex',
       alignItems: 'center',
-      gap: '12px',
+      gap: isMobile ? '8px' : '12px',
       letterSpacing: '-0.5px'
     },
     button: {
       backgroundColor: '#4F46E5',
       color: 'white',
       border: 'none',
-      padding: '10px 20px',
+      padding: isMobile ? '12px 16px' : '10px 20px',
       borderRadius: '12px',
       cursor: 'pointer',
-      fontSize: '14px',
+      fontSize: isMobile ? '16px' : '14px',
       fontWeight: '500',
       boxShadow: '0 2px 8px rgba(79, 70, 229, 0.2)',
       transition: 'all 0.2s ease',
+      minHeight: isMobile ? '48px' : 'auto',
+      touchAction: 'manipulation',
       '&:hover': {
         backgroundColor: '#4338CA',
         transform: 'translateY(-1px)',
@@ -398,37 +476,43 @@ const FullFlashcardApp = () => {
       backgroundColor: '#10B981',
       color: 'white',
       border: 'none',
-      padding: '10px 20px',
+      padding: isMobile ? '12px 16px' : '10px 20px',
       borderRadius: '12px',
       cursor: 'pointer',
-      fontSize: '14px',
+      fontSize: isMobile ? '16px' : '14px',
       fontWeight: '500',
       boxShadow: '0 2px 8px rgba(16, 185, 129, 0.2)',
-      transition: 'all 0.2s ease'
+      transition: 'all 0.2s ease',
+      minHeight: isMobile ? '48px' : 'auto',
+      touchAction: 'manipulation'
     },
     buttonRed: {
       backgroundColor: '#EF4444',
       color: 'white',
       border: 'none',
-      padding: '10px 20px',
+      padding: isMobile ? '12px 16px' : '10px 20px',
       borderRadius: '12px',
       cursor: 'pointer',
-      fontSize: '14px',
+      fontSize: isMobile ? '16px' : '14px',
       fontWeight: '500',
       boxShadow: '0 2px 8px rgba(239, 68, 68, 0.2)',
-      transition: 'all 0.2s ease'
+      transition: 'all 0.2s ease',
+      minHeight: isMobile ? '48px' : 'auto',
+      touchAction: 'manipulation'
     },
     buttonGray: {
       backgroundColor: '#6B7280',
       color: 'white',
       border: 'none',
-      padding: '10px 20px',
+      padding: isMobile ? '12px 16px' : '10px 20px',
       borderRadius: '12px',
       cursor: 'pointer',
-      fontSize: '14px',
+      fontSize: isMobile ? '16px' : '14px',
       fontWeight: '500',
       boxShadow: '0 2px 8px rgba(107, 114, 128, 0.2)',
-      transition: 'all 0.2s ease'
+      transition: 'all 0.2s ease',
+      minHeight: isMobile ? '48px' : 'auto',
+      touchAction: 'manipulation'
     },
     card: {
       backgroundColor: 'white',
@@ -484,12 +568,12 @@ const FullFlashcardApp = () => {
     },
     modalContent: {
       backgroundColor: 'white',
-      borderRadius: '20px',
-      padding: '32px',
-      maxWidth: '900px',
+      borderRadius: isMobile ? '12px' : '20px',
+      padding: isMobile ? '16px' : '32px',
+      maxWidth: isMobile ? '95vw' : '900px',
       width: '95%',
       boxShadow: '0 20px 60px rgba(0, 0, 0, 0.15)',
-      maxHeight: '90vh',
+      maxHeight: isMobile ? '85vh' : '90vh',
       overflow: 'auto'
     }
   };
@@ -680,10 +764,10 @@ const FullFlashcardApp = () => {
       const source = audioContext.createBufferSource();
       source.buffer = audioBuffer;
       
-      // 音量控制 - 確保至少 80% 音量
+      // 音量控制 - 提高到最大音量
       const gainNode = audioContext.createGain();
-      const volumeValue = Math.max(parseFloat(style.volume) || 1.0, 0.8);
-      console.log('🔊 設定快取音檔音量:', style.volume, '→', volumeValue, '(最小0.8)');
+      const volumeValue = 2.0; // 提高到 200% 音量
+      console.log('🔊 設定快取音檔音量:', volumeValue, '(200%)');
       gainNode.gain.setValueAtTime(volumeValue, audioContext.currentTime);
       source.connect(gainNode);
       gainNode.connect(audioContext.destination);
@@ -695,18 +779,24 @@ const FullFlashcardApp = () => {
       });
     }
     
-    // 建立進階SSML
-    const ssml = `
-      <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="ja-JP">
-        <voice name="${voice}">
-          <mstts:express-as style="${style.style}">
-            <prosody rate="${style.rate}" pitch="${style.pitch}" volume="${style.volume}">
-              ${cleanText}
-            </prosody>
-          </mstts:express-as>
-        </voice>
-      </speak>
-    `;
+    // 建立簡化 SSML (避免 400 錯誤)
+    // 使用 Azure 支援的標準格式
+    // 如果有 rateMultiplier，將倍速轉換為百分比格式 (Azure 支援 +/-50%)
+    let rateValue = style.rate || 'medium';
+    if (style.rateMultiplier) {
+      // 將 0.5-3.0 倍速轉換為 Azure 的百分比格式
+      // 1.0 = 0%, 0.5 = -50%, 2.0 = +100%
+      const percentage = Math.round((style.rateMultiplier - 1.0) * 100);
+      rateValue = percentage >= 0 ? `+${percentage}%` : `${percentage}%`;
+    }
+
+    const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ja-JP">
+<voice name="${voice}">
+<prosody rate="${rateValue}" pitch="${style.pitch}" volume="x-loud">
+${cleanText}
+</prosody>
+</voice>
+</speak>`;
 
     const response = await fetch(`https://${azureSettings.region}.tts.speech.microsoft.com/cognitiveservices/v1`, {
       method: 'POST',
@@ -756,10 +846,10 @@ const FullFlashcardApp = () => {
     const source = audioContext.createBufferSource();
     source.buffer = audioBuffer;
     
-    // 設定音量 - 強制使用較高音量確保可聽見
+    // 設定音量 - 提高到最大音量
     const gainNode = audioContext.createGain();
-    const volumeValue = Math.max(parseFloat(style.volume) || 1.0, 0.8);
-    console.log('🔊 設定新下載音檔音量:', style.volume, '→', volumeValue, '(最小0.8)');
+    const volumeValue = 2.0; // 提高到 200% 音量
+    console.log('🔊 設定新下載音檔音量:', volumeValue, '(200%)');
     gainNode.gain.setValueAtTime(volumeValue, audioContext.currentTime);
     source.connect(gainNode);
     gainNode.connect(audioContext.destination);
@@ -977,13 +1067,13 @@ const FullFlashcardApp = () => {
 
   // 初始化
   useEffect(() => {
-    // 強制重新載入新資料（清除舊的localStorage）
-    localStorage.removeItem('japanese-vocab-data');
-    
+    console.log('🔄 初始化應用程式...');
     const savedData = localStorage.getItem('japanese-vocab-data');
     if (savedData) {
+      console.log('📂 找到已保存的資料');
       try {
         const data = JSON.parse(savedData);
+        console.log('📊 載入的資料:', data);
         setFolders(data.folders || []);
         setSettings({ ...settings, ...data.settings });
         if (data.displayTemplates) {
@@ -992,10 +1082,12 @@ const FullFlashcardApp = () => {
         if (data.currentTemplate) {
           setCurrentTemplate(data.currentTemplate);
         }
+        console.log('✅ 資料載入成功');
       } catch (e) {
-        console.error('載入失敗:', e);
+        console.error('❌ 載入失敗:', e);
       }
     } else {
+      console.log('⚠️ 沒有找到已保存的資料,創建範例資料夾...');
       // 創建多個範例資料夾
       const basicVocabFolder = {
         id: Date.now() - 1000,
@@ -1323,13 +1415,308 @@ const FullFlashcardApp = () => {
 
   // 保存數據
   useEffect(() => {
-    localStorage.setItem('japanese-vocab-data', JSON.stringify({ 
-      folders, 
-      settings, 
-      displayTemplates, 
-      currentTemplate 
-    }));
+    if (folders.length > 0) {
+      const dataToSave = {
+        folders,
+        settings,
+        displayTemplates,
+        currentTemplate
+      };
+      console.log('💾 保存資料到 localStorage:', dataToSave);
+      localStorage.setItem('japanese-vocab-data', JSON.stringify(dataToSave));
+      console.log('✅ 資料已保存');
+
+      // 自動雲端同步
+      if (syncSettings.autoSync && syncSettings.githubToken && syncSettings.gistId) {
+        syncToCloud(dataToSave);
+      }
+    }
   }, [folders, settings, displayTemplates, currentTemplate]);
+
+  // 雲端同步功能
+  const syncToCloud = async (data) => {
+    if (!syncSettings.githubToken || !syncSettings.gistId) {
+      console.warn('⚠️ 雲端同步設定不完整');
+      return;
+    }
+
+    try {
+      const response = await fetch(`https://api.github.com/gists/${syncSettings.gistId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `token ${syncSettings.githubToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          files: {
+            'flashcard-data.json': {
+              content: JSON.stringify(data, null, 2)
+            }
+          }
+        })
+      });
+
+      if (response.ok) {
+        console.log('☁️ 資料已同步到雲端');
+        setSyncSettings(prev => ({ ...prev, lastSyncTime: new Date().toISOString() }));
+      } else {
+        console.error('❌ 雲端同步失敗:', response.statusText);
+      }
+    } catch (error) {
+      console.error('❌ 雲端同步錯誤:', error);
+    }
+  };
+
+  const syncFromCloud = async () => {
+    if (!syncSettings.githubToken || !syncSettings.gistId) {
+      alert('請先設定 GitHub Token 和 Gist ID');
+      return;
+    }
+
+    try {
+      const response = await fetch(`https://api.github.com/gists/${syncSettings.gistId}`, {
+        headers: {
+          'Authorization': `token ${syncSettings.githubToken}`,
+        }
+      });
+
+      if (response.ok) {
+        const gist = await response.json();
+        const fileContent = gist.files['flashcard-data.json']?.content;
+
+        if (fileContent) {
+          const data = JSON.parse(fileContent);
+          setFolders(data.folders || []);
+          setSettings(data.settings || settings);
+          setDisplayTemplates(data.displayTemplates || displayTemplates);
+          setCurrentTemplate(data.currentTemplate || currentTemplate);
+
+          console.log('☁️ 從雲端載入資料成功');
+          setSyncSettings(prev => ({ ...prev, lastSyncTime: new Date().toISOString() }));
+          alert('✅ 從雲端同步成功！');
+        } else {
+          alert('❌ Gist 中找不到資料檔案');
+        }
+      } else {
+        alert('❌ 無法從雲端讀取資料');
+      }
+    } catch (error) {
+      console.error('❌ 從雲端同步錯誤:', error);
+      alert('❌ 同步失敗: ' + error.message);
+    }
+  };
+
+  // 匯出資料為 JSON 檔案
+  const exportData = () => {
+    const dataToExport = {
+      folders,
+      settings,
+      displayTemplates,
+      currentTemplate,
+      exportTime: new Date().toISOString()
+    };
+
+    const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `flashcard-data-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    console.log('📥 資料已匯出');
+    alert('✅ 資料已匯出！');
+  };
+
+  // 匯入資料從 JSON 檔案
+  const importData = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+
+        if (confirm('確定要匯入資料嗎？這將會覆蓋目前的所有資料！')) {
+          setFolders(data.folders || []);
+          setSettings(data.settings || settings);
+          setDisplayTemplates(data.displayTemplates || displayTemplates);
+          setCurrentTemplate(data.currentTemplate || currentTemplate);
+
+          console.log('📤 資料已匯入');
+          alert('✅ 資料已匯入成功！');
+        }
+      } catch (error) {
+        console.error('❌ 匯入失敗:', error);
+        alert('❌ 匯入失敗: 檔案格式錯誤');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // 雲端同步對話框
+  const SyncDialog = () => {
+    const [localSyncSettings, setLocalSyncSettings] = useState(syncSettings);
+
+    const saveSyncSettings = () => {
+      setSyncSettings(localSyncSettings);
+      localStorage.setItem('sync-settings', JSON.stringify(localSyncSettings));
+      setShowSyncDialog(false);
+      alert('✅ 同步設定已保存！');
+    };
+
+    const createNewGist = async () => {
+      if (!localSyncSettings.githubToken) {
+        alert('請先輸入 GitHub Token');
+        return;
+      }
+
+      try {
+        const response = await fetch('https://api.github.com/gists', {
+          method: 'POST',
+          headers: {
+            'Authorization': `token ${localSyncSettings.githubToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            description: '單字閃卡資料',
+            public: false,
+            files: {
+              'flashcard-data.json': {
+                content: JSON.stringify({ folders: [], settings: {}, displayTemplates: [], currentTemplate: null }, null, 2)
+              }
+            }
+          })
+        });
+
+        if (response.ok) {
+          const gist = await response.json();
+          setLocalSyncSettings(prev => ({ ...prev, gistId: gist.id }));
+          alert(`✅ Gist 已建立！\nGist ID: ${gist.id}\n\n請記下這個 ID`);
+        } else {
+          alert('❌ 建立 Gist 失敗');
+        }
+      } catch (error) {
+        alert('❌ 建立 Gist 錯誤: ' + error.message);
+      }
+    };
+
+    return (
+      <div style={styles.modal}>
+        <div style={{ ...styles.modalContent, maxWidth: isMobile ? '95vw' : '600px' }}>
+          <h2 style={{ margin: '0 0 20px 0', color: '#1f2937', fontSize: isMobile ? '18px' : '24px' }}>☁️ 雲端同步設定</h2>
+
+          <div style={{ marginBottom: '20px' }}>
+            <h3 style={{ fontSize: isMobile ? '14px' : '16px', marginBottom: '10px' }}>📦 匯出/匯入資料</h3>
+            <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '10px' }}>
+              <button onClick={exportData} style={{ ...styles.button, flex: 1 }}>
+                📥 匯出資料
+              </button>
+              <label style={{ ...styles.button, flex: 1, textAlign: 'center', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                📤 匯入資料
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={importData}
+                  style={{ display: 'none' }}
+                />
+              </label>
+            </div>
+          </div>
+
+          <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '20px', marginTop: '20px' }}>
+            <h3 style={{ fontSize: isMobile ? '14px' : '16px', marginBottom: '10px' }}>☁️ GitHub Gist 同步</h3>
+
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontSize: isMobile ? '13px' : '14px', fontWeight: '600' }}>
+                GitHub Personal Access Token:
+              </label>
+              <input
+                type="password"
+                value={localSyncSettings.githubToken}
+                onChange={(e) => setLocalSyncSettings(prev => ({ ...prev, githubToken: e.target.value }))}
+                style={{ ...styles.input, width: '100%', fontSize: isMobile ? '16px' : '14px' }}
+                placeholder="ghp_xxxxxxxxxxxx"
+              />
+              <p style={{ fontSize: isMobile ? '11px' : '12px', color: '#6b7280', margin: '5px 0 0 0' }}>
+                需要 'gist' 權限。
+                <a href="https://github.com/settings/tokens/new" target="_blank" rel="noopener noreferrer" style={{ color: '#4F46E5' }}>
+                  建立 Token
+                </a>
+              </p>
+            </div>
+
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontSize: isMobile ? '13px' : '14px', fontWeight: '600' }}>
+                Gist ID:
+              </label>
+              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '10px' }}>
+                <input
+                  type="text"
+                  value={localSyncSettings.gistId}
+                  onChange={(e) => setLocalSyncSettings(prev => ({ ...prev, gistId: e.target.value }))}
+                  style={{ ...styles.input, flex: 1, fontSize: isMobile ? '16px' : '14px' }}
+                  placeholder="abc123def456..."
+                />
+                <button onClick={createNewGist} style={{ ...styles.button, flex: isMobile ? 0 : 'auto' }}>
+                  建立新 Gist
+                </button>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={localSyncSettings.autoSync}
+                  onChange={(e) => setLocalSyncSettings(prev => ({ ...prev, autoSync: e.target.checked }))}
+                />
+                <span>自動同步（每次儲存時自動上傳到雲端）</span>
+              </label>
+            </div>
+
+            {localSyncSettings.lastSyncTime && (
+              <p style={{ fontSize: '12px', color: '#6b7280' }}>
+                上次同步: {new Date(localSyncSettings.lastSyncTime).toLocaleString('zh-TW')}
+              </p>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '10px', marginTop: '15px' }}>
+              <button
+                onClick={syncFromCloud}
+                style={{ ...styles.button, flex: 1 }}
+                disabled={!localSyncSettings.githubToken || !localSyncSettings.gistId}
+              >
+                ⬇️ 從雲端下載
+              </button>
+              <button
+                onClick={() => {
+                  const dataToSave = { folders, settings, displayTemplates, currentTemplate };
+                  syncToCloud(dataToSave);
+                }}
+                style={{ ...styles.button, flex: 1 }}
+                disabled={!localSyncSettings.githubToken || !localSyncSettings.gistId}
+              >
+                ⬆️ 上傳到雲端
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '10px', marginTop: '20px' }}>
+            <button onClick={saveSyncSettings} style={{ ...styles.button, flex: 1 }}>
+              ✅ 保存設定
+            </button>
+            <button onClick={() => setShowSyncDialog(false)} style={{ ...styles.buttonRed, flex: 1 }}>
+              ✖ 關閉
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // Azure TTS設定對話框
   const TTSSettingsDialog = () => {
@@ -1929,112 +2316,329 @@ const FullFlashcardApp = () => {
           <div style={{ marginTop: '20px' }}>
             <h4 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '10px' }}>現有欄位設定</h4>
             <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '10px' }}>💡 提示：拖曳左側手柄可調整欄位順序，最上面的為第一欄</p>
-            <div style={{ maxHeight: '300px', overflow: 'auto' }}>
+            <div style={{ maxHeight: '500px', overflow: 'auto' }}>
               {Object.entries(editingFields)
                 .sort(([,a], [,b]) => (a.order || 0) - (b.order || 0))
-                .map(([key, field]) => (
-                <div 
-                  key={key} 
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, key)}
-                  onDragOver={(e) => handleDragOver(e, key)}
-                  onDragLeave={handleDragLeave}
-                  onDrop={(e) => handleDrop(e, key)}
-                  style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: '40px 120px 1fr 120px 200px 80px 60px 60px', 
-                    gap: '10px', 
-                    alignItems: 'center',
-                    padding: '10px',
-                    border: `2px solid ${dragOverItem === key ? '#3b82f6' : '#e5e7eb'}`,
-                    borderRadius: '6px',
-                    marginBottom: '10px',
-                    backgroundColor: draggedItem === key ? '#f1f5f9' : 'white',
-                    cursor: 'move',
-                    opacity: draggedItem === key ? 0.7 : 1,
-                    transform: draggedItem === key ? 'scale(0.98)' : 'scale(1)',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  {/* 拖曳手柄 */}
-                  <div style={{ 
-                    color: '#9ca3af', 
-                    cursor: 'grab', 
-                    textAlign: 'center',
-                    fontSize: '18px',
-                    userSelect: 'none'
-                  }}
-                    onMouseDown={(e) => e.currentTarget.style.cursor = 'grabbing'}
-                    onMouseUp={(e) => e.currentTarget.style.cursor = 'grab'}
-                  >
-                    ⋮⋮
-                  </div>
-                  <div style={{ fontSize: '14px', color: '#6b7280' }}>{key}</div>
-                  <input
-                    type="text"
-                    value={field.label}
-                    onChange={(e) => updateField(key, { label: e.target.value })}
-                    style={{ ...styles.input, margin: 0 }}
-                  />
-                  <select
-                    value={field.type}
-                    onChange={(e) => updateField(key, { type: e.target.value })}
-                    style={{ ...styles.input, margin: 0 }}
-                  >
-                    <option value="text">純文字</option>
-                    <option value="kanji">漢字注音</option>
-                  </select>
-                  <select
-                    value={field.voice || settings.azureTTS.defaultVoice}
-                    onChange={(e) => updateField(key, { voice: e.target.value })}
-                    style={{ ...styles.input, margin: 0, fontSize: '12px' }}
-                  >
-                    {Object.entries(AVAILABLE_VOICES).map(([category, voices]) => (
-                      <optgroup key={category} label={category}>
-                        {voices.map(voice => (
-                          <option key={voice.value} value={voice.value}>
-                            {voice.label}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      console.log('⚙ 按鈕被點擊了！', key, field);
-                      setEditingFieldKey(key);
-                      setEditingVoiceStyle(field.voiceStyle || {
-                        rate: 'medium',
-                        pitch: 'medium',
-                        style: 'general',
-                        volume: 1.0
-                      });
-                      setShowVoiceStyleEditor(true);
-                      console.log('showVoiceStyleEditor 設置為 true');
-                    }}
-                    style={{ ...styles.button, padding: '6px 8px', fontSize: '12px', backgroundColor: '#8b5cf6' }}
-                    title="語音風格設定"
-                  >
-    ⚙
-                  </button>
-                  <input
-                    type="number"
-                    value={field.order || 0}
-                    onChange={(e) => updateField(key, { order: parseInt(e.target.value) })}
-                    style={{ ...styles.input, margin: 0 }}
-                    min="1"
-                  />
-                  <button
-                    onClick={() => removeField(key)}
-                    style={{ ...styles.buttonRed, padding: '6px 8px', fontSize: '12px' }}
-                    title="刪除欄位"
-                  >
-  🗑
-                  </button>
-                </div>
-              ))}
+                .map(([key, field]) => {
+                  // 取得該欄位在前3張卡片的資料
+                  const sampleData = currentFolder && currentFolder.cards
+                    ? currentFolder.cards.slice(0, 3).map(card => card.fields[key] || '(無資料)')
+                    : [];
+
+                  return (
+                    <div
+                      key={key}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, key)}
+                      onDragOver={(e) => handleDragOver(e, key)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, key)}
+                      style={{
+                        padding: '12px',
+                        border: `2px solid ${dragOverItem === key ? '#3b82f6' : '#e5e7eb'}`,
+                        borderRadius: '8px',
+                        marginBottom: '12px',
+                        backgroundColor: draggedItem === key ? '#f1f5f9' : 'white',
+                        opacity: draggedItem === key ? 0.7 : 1,
+                        transform: draggedItem === key ? 'scale(0.98)' : 'scale(1)',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      {/* 欄位設定區 */}
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px'
+                      }}>
+                        {/* 第一行: 編號、名稱、類型、語音、速度、音調、情感、音量、刪除 */}
+                        {/* 第一行：編號、名稱、類型、預覽、刪除 */}
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: '30px 35px 75px 50px 1fr 50px',
+                          gap: '6px',
+                          alignItems: 'center'
+                        }}>
+                          {/* 拖曳手柄 */}
+                          <div style={{
+                            color: '#9ca3af',
+                            cursor: 'grab',
+                            textAlign: 'center',
+                            fontSize: '16px',
+                            userSelect: 'none'
+                          }}
+                            onMouseDown={(e) => e.currentTarget.style.cursor = 'grabbing'}
+                            onMouseUp={(e) => e.currentTarget.style.cursor = 'grab'}
+                          >
+                            ⋮⋮
+                          </div>
+
+                          {/* 順序顯示 */}
+                          <div style={{
+                            fontSize: '10px',
+                            fontWeight: '600',
+                            color: '#4F46E5',
+                            textAlign: 'center',
+                            backgroundColor: '#eef2ff',
+                            padding: '3px',
+                            borderRadius: '4px'
+                          }}>
+                            #{field.order || 0}
+                          </div>
+
+                          {/* 欄位名稱 */}
+                          <input
+                            type="text"
+                            placeholder="名稱"
+                            value={field.label}
+                            onChange={(e) => updateField(key, { label: e.target.value })}
+                            style={{ ...styles.input, margin: 0, fontSize: '11px', fontWeight: '400', padding: '5px 6px' }}
+                          />
+
+                          {/* 類型切換 - 用一個字 */}
+                          <div style={{ display: 'flex', gap: '3px' }}>
+                            <button
+                              onClick={() => updateField(key, { type: 'text' })}
+                              style={{
+                                flex: 1,
+                                padding: '5px 3px',
+                                fontSize: '10px',
+                                borderRadius: '4px',
+                                border: field.type === 'text' ? '2px solid #4F46E5' : '1px solid #d1d5db',
+                                backgroundColor: field.type === 'text' ? '#4F46E5' : 'white',
+                                color: field.type === 'text' ? 'white' : '#6b7280',
+                                cursor: 'pointer',
+                                fontWeight: field.type === 'text' ? '600' : '400',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              文
+                            </button>
+                            <button
+                              onClick={() => updateField(key, { type: 'kanji' })}
+                              style={{
+                                flex: 1,
+                                padding: '5px 3px',
+                                fontSize: '10px',
+                                borderRadius: '4px',
+                                border: field.type === 'kanji' ? '2px solid #4F46E5' : '1px solid #d1d5db',
+                                backgroundColor: field.type === 'kanji' ? '#4F46E5' : 'white',
+                                color: field.type === 'kanji' ? 'white' : '#6b7280',
+                                cursor: 'pointer',
+                                fontWeight: field.type === 'kanji' ? '600' : '400',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              注
+                            </button>
+                          </div>
+
+                          {/* 預覽 */}
+                          {sampleData.length > 0 ? (
+                            <div style={{
+                              fontSize: '12px',
+                              color: '#374151',
+                              padding: '6px 10px',
+                              backgroundColor: '#f9fafb',
+                              borderRadius: '4px',
+                              border: '1px solid #e5e7eb',
+                              borderLeft: '3px solid #3b82f6',
+                              minHeight: '30px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
+                            }}>
+                              {field.type === 'kanji' ? (
+                                <KanjiWithFurigana text={sampleData[0]} showFurigana={true} />
+                              ) : (
+                                <span>{sampleData[0]}</span>
+                              )}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: '10px', color: '#9ca3af' }}>無預覽</div>
+                          )}
+
+                          {/* 刪除按鈕 */}
+                          <button
+                            onClick={() => removeField(key)}
+                            style={{ ...styles.buttonRed, padding: '5px 6px', fontSize: '12px' }}
+                            title="刪除欄位"
+                          >
+                            🗑
+                          </button>
+                        </div>
+
+                        {/* 第二行：試聽按鈕 + 語音選擇 + 語音風格設定 */}
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: '50px 150px 1fr 1fr 1fr 1fr',
+                          gap: '6px',
+                          alignItems: 'center',
+                          marginTop: '6px',
+                          paddingLeft: '65px'
+                        }}>
+                          {/* 試聽按鈕 - 移到最前面 */}
+                          <button
+                            onClick={async () => {
+                              console.log('🔊 點擊試聽按鈕');
+
+                              if (!settings.azureTTS.enabled || !settings.azureTTS.subscriptionKey) {
+                                console.error('❌ Azure TTS 未設定');
+                                alert('請先在設定中啟用並配置 Azure TTS');
+                                return;
+                              }
+
+                              // 取得預覽文字
+                              const previewText = sampleData.length > 0 ? sampleData[0] : '試聽範例';
+                              console.log('📝 試聽文字:', previewText);
+
+                              try {
+                                // 準備語音風格參數
+                                const voiceStyle = {
+                                  pitch: field.voiceStyle?.pitch || 'medium',
+                                  style: field.voiceStyle?.style || 'general',
+                                  volume: field.voiceStyle?.volume || 1.0,
+                                  rateMultiplier: field.voiceStyle?.rateMultiplier || 1.0
+                                };
+
+                                const targetVoice = field.voice || settings.azureTTS.defaultVoice;
+                                console.log('🎤 使用語音:', targetVoice);
+                                console.log('⚙️ 語音風格:', voiceStyle);
+
+                                await speakWithAzure(previewText, targetVoice, settings.azureTTS, voiceStyle);
+                                console.log('✅ 試聽完成');
+                              } catch (error) {
+                                console.error('❌ 試聽失敗:', error);
+                                alert('試聽失敗: ' + error.message);
+                              }
+                            }}
+                            style={{
+                              padding: '8px',
+                              fontSize: '20px',
+                              borderRadius: '6px',
+                              border: '2px solid #10b981',
+                              backgroundColor: '#ecfdf5',
+                              color: '#10b981',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#10b981';
+                              e.currentTarget.style.color = 'white';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = '#ecfdf5';
+                              e.currentTarget.style.color = '#10b981';
+                            }}
+                            title="試聽語音效果"
+                          >
+                            🔊
+                          </button>
+
+                          {/* 語音選擇 */}
+                          <select
+                            value={field.voice || settings.azureTTS.defaultVoice}
+                            onChange={(e) => updateField(key, { voice: e.target.value })}
+                            style={{ ...styles.input, margin: 0, fontSize: '12px', padding: '5px' }}
+                          >
+                            <optgroup label="🇹🇼 中文">
+                              {AZURE_VOICES['zh-TW'].map(voice => (
+                                <option key={voice.value} value={voice.value}>
+                                  🇹🇼 {voice.label}
+                                </option>
+                              ))}
+                            </optgroup>
+                            <optgroup label="🇯🇵 日文">
+                              {AZURE_VOICES['ja-JP'].map(voice => (
+                                <option key={voice.value} value={voice.value}>
+                                  🇯🇵 {voice.label}
+                                </option>
+                              ))}
+                            </optgroup>
+                            <optgroup label="🇺🇸 英文">
+                              {AZURE_VOICES['en-US'].map(voice => (
+                                <option key={voice.value} value={voice.value}>
+                                  🇺🇸 {voice.label}
+                                </option>
+                              ))}
+                            </optgroup>
+                          </select>
+
+                          {/* 速度滑桿 (0.5-3倍速) */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <span style={{ fontSize: '9px', color: '#9ca3af' }}>
+                              速度 {(field.voiceStyle?.rateMultiplier || 1.0).toFixed(1)}x
+                            </span>
+                            <input
+                              type="range"
+                              min="0.5"
+                              max="3"
+                              step="0.1"
+                              value={field.voiceStyle?.rateMultiplier || 1.0}
+                              onChange={(e) => updateField(key, {
+                                voiceStyle: { ...(field.voiceStyle || {}), rateMultiplier: parseFloat(e.target.value) }
+                              })}
+                              style={{ width: '100%' }}
+                            />
+                          </div>
+
+                          {/* 音調 */}
+                          <select
+                            value={field.voiceStyle?.pitch || 'medium'}
+                            onChange={(e) => updateField(key, {
+                              voiceStyle: { ...(field.voiceStyle || {}), pitch: e.target.value }
+                            })}
+                            style={{ ...styles.input, margin: 0, fontSize: '12px', padding: '5px' }}
+                          >
+                            <option value="x-low">極低</option>
+                            <option value="low">低</option>
+                            <option value="medium">正常</option>
+                            <option value="high">高</option>
+                            <option value="x-high">極高</option>
+                          </select>
+
+                          {/* 情感 */}
+                          <select
+                            value={field.voiceStyle?.style || 'general'}
+                            onChange={(e) => updateField(key, {
+                              voiceStyle: { ...(field.voiceStyle || {}), style: e.target.value }
+                            })}
+                            style={{ ...styles.input, margin: 0, fontSize: '12px', padding: '5px' }}
+                          >
+                            <option value="general">一般</option>
+                            <option value="cheerful">開朗</option>
+                            <option value="sad">悲傷</option>
+                            <option value="angry">憤怒</option>
+                            <option value="fearful">恐懼</option>
+                            <option value="gentle">溫柔</option>
+                          </select>
+
+                          {/* 音量 */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <span style={{ fontSize: '9px', color: '#9ca3af' }}>
+                              音量 {Math.round((field.voiceStyle?.volume || 1.0) * 100)}%
+                            </span>
+                            <input
+                              type="range"
+                              min="0"
+                              max="2"
+                              step="0.1"
+                              value={field.voiceStyle?.volume || 1.0}
+                              onChange={(e) => updateField(key, {
+                                voiceStyle: { ...(field.voiceStyle || {}), volume: parseFloat(e.target.value) }
+                              })}
+                              style={{ width: '100%' }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           </div>
 
@@ -2600,7 +3204,6 @@ const FullFlashcardApp = () => {
     const [importUrl, setImportUrl] = useState('');
     const [importText, setImportText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [importMode, setImportMode] = useState('append');
 
     const parseCSVData = (csvText) => {
       const lines = csvText.split('\n').filter(line => line.trim());
@@ -2784,6 +3387,108 @@ const FullFlashcardApp = () => {
       }
     };
 
+    // .apkg 檔案匯入處理
+    const handleApkgImport = async (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      console.log('開始匯入 .apkg 檔案:', file.name);
+
+      if (!file.name.endsWith('.apkg')) {
+        alert('請選擇 .apkg 檔案');
+        return;
+      }
+
+      try {
+        // 顯示載入中提示
+        console.log('正在解析 .apkg 檔案...');
+
+        // 解析 .apkg 檔案
+        const ankiCards = await parseApkgFile(file);
+        console.log('parseApkgFile 回傳結果:', ankiCards);
+        console.log(`成功提取 ${ankiCards.length} 張卡片`);
+
+        if (!ankiCards || ankiCards.length === 0) {
+          console.warn('沒有提取到卡片');
+          alert('檔案中沒有找到卡片,請檢查檔案是否有效。');
+          return;
+        }
+
+        // 分析欄位並準備預覽數據
+        const fieldAnalysis = analyzeFields(ankiCards);
+
+        // 保存預覽數據並顯示欄位選擇器
+        setApkgPreviewData({
+          fileName: file.name.replace('.apkg', ''),
+          ankiCards: ankiCards,
+          fieldAnalysis: fieldAnalysis
+        });
+
+        setShowImportDialog(false);
+        setShowFieldSelector(true);
+
+        // 清空 file input
+        event.target.value = '';
+      } catch (error) {
+        console.error('匯入 .apkg 檔案失敗:', error);
+        console.error('錯誤堆疊:', error.stack);
+        alert(`匯入失敗: ${error.message}\n\n請開啟瀏覽器主控台查看詳細錯誤訊息。`);
+      }
+    };
+
+    // 分析 Anki 卡片的欄位
+    const analyzeFields = (ankiCards) => {
+      const fieldContentCount = {};
+      const fieldSamples = {};
+
+      ankiCards.forEach(card => {
+        Object.entries(card.fields).forEach(([fieldName, value]) => {
+          const trimmedValue = value.trim();
+          if (trimmedValue) {
+            fieldContentCount[fieldName] = (fieldContentCount[fieldName] || 0) + 1;
+            if (!fieldSamples[fieldName]) {
+              fieldSamples[fieldName] = trimmedValue.substring(0, 100);
+            }
+          }
+        });
+      });
+
+      const minCardCount = Math.max(1, Math.floor(ankiCards.length * 0.1));
+
+      // 獲取 Anki 原始欄位順序
+      const ankiFieldOrder = window._ankiFieldOrder;
+      let fieldOrder = [];
+
+      if (ankiFieldOrder) {
+        // 使用第一個模型的欄位順序(通常一個 .apkg 檔案只有一個模型)
+        const firstModelOrder = Object.values(ankiFieldOrder)[0];
+        if (firstModelOrder) {
+          fieldOrder = firstModelOrder;
+          console.log('使用 Anki 原始欄位順序:', fieldOrder);
+        }
+      }
+
+      const usefulFields = Object.keys(fieldContentCount)
+        .filter(fieldName => fieldContentCount[fieldName] >= minCardCount)
+        .map(fieldName => ({
+          name: fieldName,
+          count: fieldContentCount[fieldName],
+          sample: fieldSamples[fieldName],
+          percentage: Math.round((fieldContentCount[fieldName] / ankiCards.length) * 100),
+          originalOrder: fieldOrder.indexOf(fieldName)
+        }))
+        .sort((a, b) => {
+          // 如果有原始順序,優先使用原始順序
+          if (a.originalOrder !== -1 && b.originalOrder !== -1) {
+            return a.originalOrder - b.originalOrder;
+          }
+          // 否則按照英文字母順序
+          return a.name.localeCompare(b.name, 'en');
+        });
+
+      return usefulFields;
+    };
+
     return (
       <div style={styles.modal}>
         <div style={styles.modalContent}>
@@ -2795,17 +3500,7 @@ const FullFlashcardApp = () => {
           <div style={{ margin: '20px 0', padding: '15px', backgroundColor: '#f3f4f6', borderRadius: '6px' }}>
             <h4 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '10px' }}>匯入模式</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <input
-                  type="radio"
-                  name="importMode"
-                  value="append"
-                  checked={importMode === 'append'}
-                  onChange={(e) => setImportMode(e.target.value)}
-                />
-                <span>附加模式 - 將新數據添加到現有卡片後面</span>
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                 <input
                   type="radio"
                   name="importMode"
@@ -2813,7 +3508,26 @@ const FullFlashcardApp = () => {
                   checked={importMode === 'replace'}
                   onChange={(e) => setImportMode(e.target.value)}
                 />
-                <span style={{ color: '#dc2626' }}>替換模式 - 完全替換現有的所有卡片</span>
+                <span style={{ color: '#10b981', fontWeight: importMode === 'replace' ? '600' : '400' }}>
+                  建立新資料夾 - 將匯入的卡片建立為獨立的新資料夾
+                </span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="importMode"
+                  value="append"
+                  checked={importMode === 'append'}
+                  onChange={(e) => setImportMode(e.target.value)}
+                  disabled={!currentFolder}
+                />
+                <span style={{
+                  color: currentFolder ? '#6b7280' : '#d1d5db',
+                  fontWeight: importMode === 'append' ? '600' : '400'
+                }}>
+                  附加到現有資料夾 - 將新卡片添加到當前資料夾
+                  {currentFolder ? `「${currentFolder.name}」` : '(請先選擇資料夾)'}
+                </span>
               </label>
             </div>
           </div>
@@ -2863,6 +3577,528 @@ const FullFlashcardApp = () => {
                 從 CSV 文字匯入
               </button>
             </div>
+
+            <div style={{ padding: '15px', border: '1px solid #d1d5db', borderRadius: '6px' }}>
+              <h4 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '10px' }}>從 Anki .apkg 檔案匯入</h4>
+              <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '10px' }}>
+                支援匯入 Anki 卡包檔案 (.apkg),自動提取卡片資料
+              </p>
+              <input
+                id="apkgInput"
+                type="file"
+                accept=".apkg"
+                style={{ display: 'none' }}
+                onChange={handleApkgImport}
+              />
+              <button
+                onClick={() => document.getElementById('apkgInput').click()}
+                style={{ ...styles.button }}
+              >
+                📦 選擇 .apkg 檔案
+              </button>
+            </div>
+
+            <div style={{ padding: '15px', border: '2px solid #10b981', borderRadius: '6px', backgroundColor: '#ecfdf5' }}>
+              <h4 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '10px', color: '#059669' }}>☁️ 雲端同步</h4>
+              <p style={{ fontSize: '13px', color: '#047857', marginBottom: '10px' }}>
+                將資料同步到雲端，讓您在電腦和手機都能存取相同的卡片
+              </p>
+              <button
+                onClick={() => setShowSyncDialog(true)}
+                style={{ ...styles.button, backgroundColor: '#10b981', borderColor: '#10b981' }}
+              >
+                ☁️ 開啟雲端同步設定
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Anki 欄位選擇器
+  const FieldSelectorDialog = () => {
+    if (!apkgPreviewData) return null;
+
+    // 初始化選中的欄位及其類型
+    const [selectedFields, setSelectedFields] = useState(
+      apkgPreviewData.fieldAnalysis.slice(0, 10).map(f => ({
+        name: f.name,
+        type: 'text' // 預設為純文字
+      }))
+    );
+
+    const toggleField = (fieldName) => {
+      const isSelected = selectedFields.some(f => f.name === fieldName);
+      if (isSelected) {
+        setSelectedFields(selectedFields.filter(f => f.name !== fieldName));
+      } else {
+        setSelectedFields([...selectedFields, { name: fieldName, type: 'text' }]);
+      }
+    };
+
+    const toggleFieldType = (fieldName) => {
+      setSelectedFields(selectedFields.map(f =>
+        f.name === fieldName
+          ? { ...f, type: f.type === 'text' ? 'kanji' : 'text' }
+          : f
+      ));
+    };
+
+    const selectAll = () => {
+      setSelectedFields(apkgPreviewData.fieldAnalysis.map(f => ({
+        name: f.name,
+        type: 'text'
+      })));
+    };
+
+    const deselectAll = () => {
+      setSelectedFields([]);
+    };
+
+    const confirmImport = () => {
+      if (selectedFields.length === 0) {
+        alert('請至少選擇一個欄位');
+        return;
+      }
+
+      try {
+        // 使用選中的欄位進行轉換
+        const folderData = convertToAppFormatWithSelectedFields(
+          apkgPreviewData.ankiCards,
+          selectedFields,
+          apkgPreviewData.fileName
+        );
+
+        // 根據匯入模式處理
+        if (importMode === 'replace') {
+          // 替換模式:建立新資料夾
+          const newFolder = {
+            id: Date.now(),
+            icon: '📚',
+            ...folderData
+          };
+          setFolders([...folders, newFolder]);
+          setCurrentFolder(newFolder);
+          setCurrentView('folder');
+          alert(`成功建立新資料夾「${newFolder.name}」並匯入 ${folderData.cards.length} 張卡片`);
+        } else {
+          // 附加模式:加到現有資料夾
+          if (!currentFolder) {
+            alert('請先選擇或創建一個資料夾');
+            return;
+          }
+
+          const updatedFolder = {
+            ...currentFolder,
+            cards: [...currentFolder.cards, ...folderData.cards],
+            // 合併 customFields,保留舊的並加入新的
+            customFields: {
+              ...currentFolder.customFields,
+              ...folderData.customFields
+            }
+          };
+
+          setFolders(folders.map(f => f.id === currentFolder.id ? updatedFolder : f));
+          setCurrentFolder(updatedFolder);
+          alert(`成功附加 ${folderData.cards.length} 張卡片到「${currentFolder.name}」`);
+        }
+
+        setShowFieldSelector(false);
+        setApkgPreviewData(null);
+      } catch (error) {
+        console.error('匯入失敗:', error);
+        alert('匯入失敗: ' + error.message);
+      }
+    };
+
+    const convertToAppFormatWithSelectedFields = (ankiCards, selectedFieldsWithTypes, folderName) => {
+      const fields = {};
+      selectedFieldsWithTypes.forEach((fieldObj, index) => {
+        fields[`field${index + 1}`] = {
+          label: fieldObj.name,
+          type: fieldObj.type,
+          order: index
+        };
+      });
+
+      const cards = ankiCards.map((ankiCard, index) => {
+        const convertedCard = {
+          id: ankiCard.id || `card-${Date.now()}-${index}`,
+          fields: {}
+        };
+
+        Object.entries(fields).forEach(([fieldKey, fieldDef]) => {
+          convertedCard.fields[fieldKey] = ankiCard.fields[fieldDef.label] || '';
+        });
+
+        return convertedCard;
+      });
+
+      return {
+        name: folderName,
+        customFields: fields,  // 使用 customFields 而不是 fields
+        cards: cards
+      };
+    };
+
+    return (
+      <div style={styles.modal}>
+        <div style={{ ...styles.modalContent, maxWidth: '800px' }}>
+          <div style={styles.flexBetween}>
+            <h3 style={{ fontSize: '18px', fontWeight: 'bold' }}>
+              選擇要匯入的欄位
+            </h3>
+            <button onClick={() => setShowFieldSelector(false)} style={styles.buttonGray}>
+              取消
+            </button>
+          </div>
+
+          <div style={{ margin: '15px 0', padding: '15px', backgroundColor: '#f0f9ff', borderRadius: '6px' }}>
+            <p style={{ fontSize: '14px', color: '#0369a1', margin: 0 }}>
+              <strong>📊 檔案資訊:</strong> {apkgPreviewData.fileName} <br />
+              <strong>📝 總卡片數:</strong> {apkgPreviewData.ankiCards.length} 張<br />
+              <strong>📂 發現欄位:</strong> {apkgPreviewData.fieldAnalysis.length} 個<br />
+              <strong>✅ 已選擇:</strong> {selectedFields.length} 個欄位
+            </p>
+          </div>
+
+          <div style={{ margin: '15px 0', display: 'flex', gap: '10px' }}>
+            <button onClick={selectAll} style={{ ...styles.button, fontSize: '13px' }}>
+              全選
+            </button>
+            <button onClick={deselectAll} style={{ ...styles.buttonGray, fontSize: '13px' }}>
+              全不選
+            </button>
+          </div>
+
+          <div style={{ maxHeight: '500px', overflowY: 'auto', border: '1px solid #d1d5db', borderRadius: '6px' }}>
+            {apkgPreviewData.fieldAnalysis.map((field, index) => {
+              const isSelected = selectedFields.some(f => f.name === field.name);
+              const fieldType = selectedFields.find(f => f.name === field.name)?.type || 'text';
+
+              return (
+                <div
+                  key={field.name}
+                  style={{
+                    padding: '16px',
+                    borderBottom: index < apkgPreviewData.fieldAnalysis.length - 1 ? '1px solid #e5e7eb' : 'none',
+                    backgroundColor: isSelected ? '#eff6ff' : 'white'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleField(field.name)}
+                      style={{ width: '20px', height: '20px', cursor: 'pointer', marginTop: '2px' }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <strong style={{ fontSize: '15px', color: '#1f2937' }}>{field.name}</strong>
+                        <span style={{ fontSize: '12px', color: '#6b7280', padding: '2px 8px', backgroundColor: '#f3f4f6', borderRadius: '4px' }}>
+                          {field.percentage}% ({field.count}/{apkgPreviewData.ankiCards.length})
+                        </span>
+                      </div>
+
+                      {/* 類型切換按鈕 */}
+                      {isSelected && (
+                        <div style={{ marginBottom: '8px' }}>
+                          <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>
+                            欄位類型:
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (fieldType !== 'text') toggleFieldType(field.name);
+                              }}
+                              style={{
+                                padding: '6px 16px',
+                                fontSize: '13px',
+                                borderRadius: '6px',
+                                border: fieldType === 'text' ? '2px solid #4F46E5' : '1px solid #d1d5db',
+                                backgroundColor: fieldType === 'text' ? '#4F46E5' : 'white',
+                                color: fieldType === 'text' ? 'white' : '#6b7280',
+                                cursor: 'pointer',
+                                fontWeight: fieldType === 'text' ? '600' : '400'
+                              }}
+                            >
+                              純文字
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (fieldType !== 'kanji') toggleFieldType(field.name);
+                              }}
+                              style={{
+                                padding: '6px 16px',
+                                fontSize: '13px',
+                                borderRadius: '6px',
+                                border: fieldType === 'kanji' ? '2px solid #4F46E5' : '1px solid #d1d5db',
+                                backgroundColor: fieldType === 'kanji' ? '#4F46E5' : 'white',
+                                color: fieldType === 'kanji' ? 'white' : '#6b7280',
+                                cursor: 'pointer',
+                                fontWeight: fieldType === 'kanji' ? '600' : '400'
+                              }}
+                            >
+                              漢字注音
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 預覽內容 */}
+                      <div style={{
+                        padding: '10px',
+                        backgroundColor: '#f9fafb',
+                        borderRadius: '6px',
+                        border: '1px solid #e5e7eb'
+                      }}>
+                        <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '4px' }}>
+                          預覽:
+                        </div>
+                        <div style={{ fontSize: '13px', color: '#374151', lineHeight: '1.5' }}>
+                          {isSelected && fieldType === 'kanji' ? (
+                            <KanjiWithFurigana text={field.sample} showFurigana={true} />
+                          ) : (
+                            field.sample
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+            <button onClick={() => setShowFieldSelector(false)} style={styles.buttonGray}>
+              取消
+            </button>
+            <button
+              onClick={confirmImport}
+              style={styles.button}
+              disabled={selectedFields.length === 0}
+            >
+              確認匯入 ({selectedFields.length} 個欄位)
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // 欄位分組對話框
+  const GroupByFieldDialog = () => {
+    if (!showGroupDialog || !currentFolder) return null;
+
+    const [selectedField, setSelectedField] = useState('');
+    const [groupPreview, setGroupPreview] = useState({});
+
+    const currentFields = getCurrentFields();
+    const fieldKeys = Object.entries(currentFields)
+      .sort((a, b) => (a[1].order ?? 0) - (b[1].order ?? 0))
+      .map(([key, field]) => ({ key, label: field.label }));
+
+    // 當選擇欄位時,預覽分組結果
+    useEffect(() => {
+      if (selectedField && currentFolder.cards) {
+        const groups = {};
+        currentFolder.cards.forEach(card => {
+          const value = card.fields[selectedField] || '(空白)';
+          if (!groups[value]) {
+            groups[value] = [];
+          }
+          groups[value].push(card);
+        });
+        setGroupPreview(groups);
+      }
+    }, [selectedField]);
+
+    const createSubFolders = () => {
+      if (!selectedField || Object.keys(groupPreview).length === 0) {
+        alert('請先選擇欄位');
+        return;
+      }
+
+      // 建立子資料夾
+      const subFolders = Object.entries(groupPreview).map(([value, cards]) => ({
+        id: `${currentFolder.id}-sub-${Date.now()}-${Math.random()}`,
+        name: value,
+        cards: cards,
+        isSubFolder: true,
+        parentId: currentFolder.id
+      }));
+
+      // 更新資料夾,加入 subFolders 屬性
+      const updatedFolder = {
+        ...currentFolder,
+        subFolders: subFolders
+      };
+
+      setFolders(folders.map(f => f.id === currentFolder.id ? updatedFolder : f));
+      setCurrentFolder(updatedFolder);
+      setShowGroupDialog(false);
+      alert(`成功建立 ${subFolders.length} 個子資料夾!`);
+    };
+
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 10000
+      }} onClick={() => setShowGroupDialog(false)}>
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '12px',
+          padding: '32px',
+          maxWidth: '700px',
+          width: '90%',
+          maxHeight: '80vh',
+          overflow: 'auto',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+        }} onClick={(e) => e.stopPropagation()}>
+
+          <h2 style={{
+            fontSize: '24px',
+            fontWeight: 'bold',
+            marginBottom: '24px',
+            color: '#1f2937'
+          }}>
+            依欄位分組建立子資料夾
+          </h2>
+
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{
+              display: 'block',
+              marginBottom: '8px',
+              fontWeight: '600',
+              color: '#374151'
+            }}>
+              選擇分組欄位:
+            </label>
+            <select
+              value={selectedField}
+              onChange={(e) => setSelectedField(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '12px',
+                fontSize: '16px',
+                borderRadius: '8px',
+                border: '2px solid #e5e7eb',
+                outline: 'none'
+              }}
+            >
+              <option value="">-- 請選擇欄位 --</option>
+              {fieldKeys.map(({ key, label }) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
+          </div>
+
+          {selectedField && Object.keys(groupPreview).length > 0 && (
+            <div style={{
+              marginBottom: '24px',
+              padding: '16px',
+              backgroundColor: '#f9fafb',
+              borderRadius: '8px',
+              border: '1px solid #e5e7eb'
+            }}>
+              <h3 style={{
+                fontSize: '16px',
+                fontWeight: '600',
+                marginBottom: '12px',
+                color: '#374151'
+              }}>
+                分組預覽 (共 {Object.keys(groupPreview).length} 個群組):
+              </h3>
+              <div style={{
+                maxHeight: '300px',
+                overflow: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px'
+              }}>
+                {Object.entries(groupPreview)
+                  .sort((a, b) => b[1].length - a[1].length) // 按卡片數量排序
+                  .map(([value, cards]) => (
+                    <div key={value} style={{
+                      padding: '12px',
+                      backgroundColor: 'white',
+                      borderRadius: '6px',
+                      border: '1px solid #e5e7eb',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}>
+                      <span style={{
+                        fontWeight: '500',
+                        color: '#1f2937',
+                        flex: 1
+                      }}>
+                        {value || '(空白)'}
+                      </span>
+                      <span style={{
+                        padding: '4px 12px',
+                        backgroundColor: '#4F46E5',
+                        color: 'white',
+                        borderRadius: '12px',
+                        fontSize: '14px',
+                        fontWeight: '600'
+                      }}>
+                        {cards.length} 張
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          <div style={{
+            display: 'flex',
+            gap: '12px',
+            justifyContent: 'flex-end'
+          }}>
+            <button
+              onClick={() => setShowGroupDialog(false)}
+              style={{
+                padding: '12px 24px',
+                fontSize: '16px',
+                borderRadius: '8px',
+                border: '2px solid #e5e7eb',
+                backgroundColor: 'white',
+                color: '#6b7280',
+                cursor: 'pointer',
+                fontWeight: '600'
+              }}
+            >
+              取消
+            </button>
+            <button
+              onClick={createSubFolders}
+              disabled={!selectedField || Object.keys(groupPreview).length === 0}
+              style={{
+                padding: '12px 24px',
+                fontSize: '16px',
+                borderRadius: '8px',
+                border: 'none',
+                backgroundColor: selectedField ? '#4F46E5' : '#9ca3af',
+                color: 'white',
+                cursor: selectedField ? 'pointer' : 'not-allowed',
+                fontWeight: '600'
+              }}
+            >
+              建立子資料夾
+            </button>
           </div>
         </div>
       </div>
@@ -2986,55 +4222,104 @@ const FullFlashcardApp = () => {
             </div>
           </div>
 
-          <div style={{ marginTop: '20px', overflow: 'auto', maxHeight: '400px' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #d1d5db' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#f3f4f6' }}>
-                  <th style={{ border: '1px solid #d1d5db', padding: '8px', fontSize: '12px' }}>操作</th>
-                  {Object.entries(currentFields)
-                    .sort(([,a], [,b]) => (a.order || 0) - (b.order || 0))
-                    .map(([key, field]) => (
-                    <th key={key} style={{ border: '1px solid #d1d5db', padding: '8px', fontSize: '12px', minWidth: '120px' }}>
-                      {field.label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
+          <div style={{ marginTop: '20px', overflow: 'auto', maxHeight: isMobile ? '500px' : '400px' }}>
+            {isMobile ? (
+              /* 手機版：卡片視圖 */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {editData.map((row, rowIndex) => (
-                  <tr key={row.id || rowIndex}>
-                    <td style={{ border: '1px solid #d1d5db', padding: '4px', textAlign: 'center' }}>
-                      <button 
-                        style={{ ...styles.buttonRed, padding: '4px 8px', fontSize: '12px' }} 
+                  <div key={row.id || rowIndex} style={{
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    padding: '12px',
+                    backgroundColor: '#ffffff'
+                  }}>
+                    <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '14px', fontWeight: '600', color: '#374151' }}>卡片 {rowIndex + 1}</span>
+                      <button
+                        style={{ ...styles.buttonRed, padding: '6px 12px', fontSize: '13px' }}
                         onClick={() => deleteRow(rowIndex)}
                       >
                         刪除
                       </button>
-                    </td>
+                    </div>
                     {Object.entries(currentFields)
                       .sort(([,a], [,b]) => (a.order || 0) - (b.order || 0))
                       .map(([fieldKey, field]) => (
-                      <td key={fieldKey} style={{ border: '1px solid #d1d5db', padding: '4px' }}>
-                        <textarea
-                          value={row[fieldKey] || ''}
-                          onChange={(e) => updateCell(rowIndex, fieldKey, e.target.value)}
-                          style={{ 
-                            width: '100%', 
-                            minWidth: '100px', 
-                            fontSize: '12px', 
-                            border: 'none', 
-                            resize: 'none',
-                            outline: 'none'
-                          }}
-                          rows="2"
-                          placeholder={`輸入${field.label}`}
-                        />
-                      </td>
+                        <div key={fieldKey} style={{ marginBottom: '10px' }}>
+                          <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#6b7280', marginBottom: '4px' }}>
+                            {field.label}
+                          </label>
+                          <textarea
+                            value={row[fieldKey] || ''}
+                            onChange={(e) => updateCell(rowIndex, fieldKey, e.target.value)}
+                            style={{
+                              width: '100%',
+                              fontSize: '14px',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '6px',
+                              padding: '8px',
+                              resize: 'vertical',
+                              outline: 'none'
+                            }}
+                            rows="2"
+                            placeholder={`輸入${field.label}`}
+                          />
+                        </div>
+                      ))}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              /* 桌面版：表格視圖 */
+              <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #d1d5db' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f3f4f6' }}>
+                    <th style={{ border: '1px solid #d1d5db', padding: '8px', fontSize: '12px' }}>操作</th>
+                    {Object.entries(currentFields)
+                      .sort(([,a], [,b]) => (a.order || 0) - (b.order || 0))
+                      .map(([key, field]) => (
+                      <th key={key} style={{ border: '1px solid #d1d5db', padding: '8px', fontSize: '12px', minWidth: '120px' }}>
+                        {field.label}
+                      </th>
                     ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {editData.map((row, rowIndex) => (
+                    <tr key={row.id || rowIndex}>
+                      <td style={{ border: '1px solid #d1d5db', padding: '4px', textAlign: 'center' }}>
+                        <button
+                          style={{ ...styles.buttonRed, padding: '4px 8px', fontSize: '12px' }}
+                          onClick={() => deleteRow(rowIndex)}
+                        >
+                          刪除
+                        </button>
+                      </td>
+                      {Object.entries(currentFields)
+                        .sort(([,a], [,b]) => (a.order || 0) - (b.order || 0))
+                        .map(([fieldKey, field]) => (
+                        <td key={fieldKey} style={{ border: '1px solid #d1d5db', padding: '4px' }}>
+                          <textarea
+                            value={row[fieldKey] || ''}
+                            onChange={(e) => updateCell(rowIndex, fieldKey, e.target.value)}
+                            style={{
+                              width: '100%',
+                              minWidth: '100px',
+                              fontSize: '12px',
+                              border: 'none',
+                              resize: 'none',
+                              outline: 'none'
+                            }}
+                            rows="2"
+                            placeholder={`輸入${field.label}`}
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
 
           {/* 顯示提示資訊 */}
@@ -3053,6 +4338,8 @@ const FullFlashcardApp = () => {
         {/* 顯示各種對話框 */}
         {showFieldEditor && <FieldEditor />}
         {showImportDialog && <ImportDialog />}
+        {showFieldSelector && <FieldSelectorDialog />}
+        {showGroupDialog && <GroupByFieldDialog />}
         {/* 語音風格編輯器對話框 */}
         {(console.log('VoiceStyleEditor 狀態檢查:', showVoiceStyleEditor, editingFieldKey), showVoiceStyleEditor) && (
           <VoiceStyleEditor 
@@ -3245,27 +4532,77 @@ const FullFlashcardApp = () => {
           padding: '40px',
           maxWidth: '800px',
           width: '90%',
-          textAlign: 'center',
           boxShadow: '0 10px 25px rgba(0,0,0,0.2)'
         }}>
+          {/* 頁面頂部欄位顯示 */}
+          {template.topFields && template.topFields.length > 0 && (
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-around',
+              padding: '12px 20px',
+              backgroundColor: '#fffbeb',
+              borderRadius: '8px',
+              marginBottom: '20px',
+              gap: '10px',
+              border: '1px solid #fbbf24'
+            }}>
+              {template.topFields.map((fieldKey) => {
+                const field = currentFields[fieldKey];
+                const value = currentCard.fields[fieldKey];
+                if (!value) return null;
+
+                return (
+                  <div key={fieldKey} style={{ textAlign: 'center', flex: 1 }}>
+                    <div style={{ fontSize: '11px', color: '#92400e', marginBottom: '4px', fontWeight: '500' }}>
+                      {field?.label || fieldKey}
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#78350f', fontWeight: '600' }}>
+                      {field?.type === 'kanji' ?
+                        value.replace(/\[.*?\]/g, '') : // 頂部欄位移除注音
+                        value
+                      }
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           <div style={{ fontSize: '18px', color: '#6b7280', marginBottom: '10px' }}>
             {template.name}
           </div>
-          
+
           {template.fields.map((fieldKey, index) => {
             const field = currentFields[fieldKey];
             const value = currentCard.fields[fieldKey];
-            
+            const fieldStyle = template.fieldStyles?.[fieldKey] || { fontSize: 24, fontFamily: 'sans-serif', textAlign: 'center' };
+
             if (!value) return null;
-            
+
             return (
-              <div key={fieldKey} style={{ marginBottom: index < template.fields.length - 1 ? '20px' : '0' }}>
+              <div
+                key={fieldKey}
+                style={{
+                  marginBottom: index < template.fields.length - 1 ? '20px' : '0',
+                  textAlign: fieldStyle.textAlign
+                }}
+              >
                 {field?.type === 'kanji' ? (
-                  <div style={{ fontSize: '28px', lineHeight: '1.4', color: '#1f2937' }}>
+                  <div style={{
+                    fontSize: `${fieldStyle.fontSize}px`,
+                    lineHeight: '1.8',
+                    color: '#1f2937',
+                    fontFamily: fieldStyle.fontFamily
+                  }}>
                     <KanjiWithFurigana text={value} showFurigana={template.showFurigana} />
                   </div>
                 ) : (
-                  <div style={{ fontSize: '24px', lineHeight: '1.4', color: '#374151' }}>
+                  <div style={{
+                    fontSize: `${fieldStyle.fontSize}px`,
+                    lineHeight: '1.4',
+                    color: '#374151',
+                    fontFamily: fieldStyle.fontFamily
+                  }}>
                     {value}
                   </div>
                 )}
@@ -3405,6 +4742,16 @@ const FullFlashcardApp = () => {
     };
     
     if (!card) return null;
+
+    // 如果卡片沒有 pages 屬性,建立預設的 page
+    if (!card.pages || card.pages.length === 0) {
+      card.pages = [{
+        id: 'default',
+        name: '預設腳本',
+        script: []
+      }];
+    }
+
     const currentDisplayPage = card.pages[currentPageIndex];
     const currentScriptPage = card.pages[currentScriptIndex];
 
@@ -3423,18 +4770,18 @@ const FullFlashcardApp = () => {
     };
 
     return (
-      <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
-        <div style={styles.flexBetween}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <button 
-              style={styles.buttonGray} 
+      <div style={{ padding: isMobile ? '12px' : '20px', maxWidth: isMobile ? '100%' : '800px', margin: '0 auto' }}>
+        <div style={{ ...styles.flexBetween, flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'center', gap: isMobile ? '10px' : '0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: isMobile ? '100%' : 'auto' }}>
+            <button
+              style={styles.buttonGray}
               onClick={() => setCurrentView('folder')}
             >
               ← 返回
             </button>
-            <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>學習模式 - {currentFolder.name}</h1>
+            <h1 style={{ fontSize: isMobile ? '18px' : '24px', fontWeight: 'bold' }}>學習模式 - {currentFolder.name}</h1>
           </div>
-          <div style={{ fontSize: '14px', color: '#6b7280' }}>
+          <div style={{ fontSize: isMobile ? '13px' : '14px', color: '#6b7280', width: isMobile ? '100%' : 'auto', textAlign: isMobile ? 'right' : 'left' }}>
             卡片 {currentCardIndex + 1}/{cards.length}
           </div>
         </div>
@@ -3466,14 +4813,14 @@ const FullFlashcardApp = () => {
             </div>
             
             {/* ABCDE模板選擇器 */}
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: isMobile ? '6px' : '8px', flexWrap: 'wrap' }}>
               {Object.entries(displayTemplates).map(([templateId, template]) => (
                 <button
                   key={templateId}
                   onClick={() => setCurrentTemplate(templateId)}
                   style={{
-                    padding: '10px 14px',
-                    fontSize: '14px',
+                    padding: isMobile ? '8px 10px' : '10px 14px',
+                    fontSize: isMobile ? '12px' : '14px',
                     borderRadius: '8px',
                     border: '2px solid #d1d5db',
                     backgroundColor: currentTemplate === templateId ? '#10b981' : 'white',
@@ -3483,20 +4830,21 @@ const FullFlashcardApp = () => {
                     boxShadow: currentTemplate === templateId ? '0 4px 12px rgba(16, 185, 129, 0.3)' : '0 2px 4px rgba(0, 0, 0, 0.1)',
                     transform: currentTemplate === templateId ? 'translateY(-1px)' : 'none',
                     transition: 'all 0.2s ease',
-                    width: '90px',
-                    height: '75px',
-                    minWidth: '90px',
-                    minHeight: '75px',
-                    maxWidth: '90px',
-                    maxHeight: '75px',
+                    width: isMobile ? '60px' : '90px',
+                    height: isMobile ? '60px' : '75px',
+                    minWidth: isMobile ? '60px' : '90px',
+                    minHeight: isMobile ? '60px' : '75px',
+                    maxWidth: isMobile ? '60px' : '90px',
+                    maxHeight: isMobile ? '60px' : '75px',
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'center',
-                    alignItems: 'center'
+                    alignItems: 'center',
+                    touchAction: 'manipulation'
                   }}
                 >
-                  <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{templateId}</div>
-                  <div style={{ fontSize: '10px', opacity: 0.8, marginTop: '2px', textAlign: 'center', lineHeight: '1.2' }}>{template.name}</div>
+                  <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: 'bold' }}>{templateId}</div>
+                  <div style={{ fontSize: isMobile ? '9px' : '10px', opacity: 0.8, marginTop: '2px', textAlign: 'center', lineHeight: '1.2' }}>{template.name}</div>
                 </button>
               ))}
             </div>
@@ -3508,29 +4856,83 @@ const FullFlashcardApp = () => {
             </div>
           </div>
           
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {(() => {
               // 使用當前選擇的模板
-              const fieldsToShow = displayTemplates[currentTemplate]?.fields || [];
-              
-              return fieldsToShow.map(fieldKey => {
-                const field = currentFields[fieldKey];
-                const value = card.fields[fieldKey];
-                
-                if (!value || !field) return null;
-                
-                return (
-                  <div key={fieldKey} style={{ textAlign: 'center' }}>
-                    {field.type === 'kanji' ? (
-                      <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#374151' }}>
-                        <KanjiWithFurigana text={value} showFurigana={displayTemplates[currentTemplate]?.showFurigana || false} />
+              const template = displayTemplates[currentTemplate];
+              const fieldsToShow = template?.fields || [];
+
+              return (
+                <>
+                  {/* 頁面頂部欄位顯示 */}
+                  {template?.topFields && template.topFields.length > 0 && (
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-around',
+                      padding: '12px 20px',
+                      backgroundColor: '#fffbeb',
+                      borderRadius: '8px',
+                      gap: '10px',
+                      border: '1px solid #fbbf24'
+                    }}>
+                      {template.topFields.map((fieldKey) => {
+                        const field = currentFields[fieldKey];
+                        const value = card.fields[fieldKey];
+                        if (!value) return null;
+
+                        return (
+                          <div key={fieldKey} style={{ textAlign: 'center', flex: 1 }}>
+                            <div style={{ fontSize: '11px', color: '#92400e', marginBottom: '4px', fontWeight: '500' }}>
+                              {field?.label || fieldKey}
+                            </div>
+                            <div style={{ fontSize: '13px', color: '#78350f', fontWeight: '600' }}>
+                              {field?.type === 'kanji' ?
+                                value.replace(/\[.*?\]/g, '') : // 頂部欄位移除注音
+                                value
+                              }
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* 主要欄位顯示 */}
+                  {fieldsToShow.map(fieldKey => {
+                    const field = currentFields[fieldKey];
+                    const value = card.fields[fieldKey];
+                    const fieldStyle = template?.fieldStyles?.[fieldKey] || { fontSize: 24, fontFamily: 'sans-serif', textAlign: 'center' };
+
+                    if (!value || !field) return null;
+
+                    return (
+                      <div key={fieldKey} style={{ textAlign: fieldStyle.textAlign }}>
+                        {field.type === 'kanji' ? (
+                          <div style={{
+                            fontSize: `${fieldStyle.fontSize}px`,
+                            fontWeight: 'bold',
+                            color: '#374151',
+                            fontFamily: fieldStyle.fontFamily,
+                            lineHeight: '1.8'
+                          }}>
+                            <KanjiWithFurigana text={value} showFurigana={template?.showFurigana || false} />
+                          </div>
+                        ) : (
+                          <p style={{
+                            fontSize: `${fieldStyle.fontSize}px`,
+                            color: '#374151',
+                            fontFamily: fieldStyle.fontFamily,
+                            lineHeight: '1.4',
+                            margin: 0
+                          }}>
+                            {value}
+                          </p>
+                        )}
                       </div>
-                    ) : (
-                      <p style={{ fontSize: '24px', color: '#374151' }}>{value}</p>
-                    )}
-                  </div>
-                );
-              });
+                    );
+                  })}
+                </>
+              );
             })()}
           </div>
         </div>
@@ -4041,6 +5443,78 @@ const FullFlashcardApp = () => {
     }
   }, []);
 
+  // 播放選中的子資料夾
+  const startAutoPlayWithSubFolders = useCallback(async () => {
+    if (!currentFolder?.subFolders || selectedSubFolders.length === 0) {
+      alert('請先選擇要播放的子資料夾');
+      return;
+    }
+
+    // 收集所有選中的子資料夾中的卡片
+    const selectedCards = [];
+    currentFolder.subFolders.forEach(subFolder => {
+      if (selectedSubFolders.includes(subFolder.id)) {
+        selectedCards.push(...subFolder.cards);
+      }
+    });
+
+    if (selectedCards.length === 0) {
+      alert('選中的子資料夾中沒有卡片');
+      return;
+    }
+
+    console.log(`開始播放 ${selectedSubFolders.length} 個子資料夾,共 ${selectedCards.length} 張卡片`);
+
+    setIsAutoPlaying(true);
+    setCurrentAutoPlayCard(0);
+    setCurrentAutoPlayStep(0);
+
+    let cardIndex = 0;
+
+    try {
+      do {
+        const card = selectedCards[cardIndex];
+        setCurrentCard(card);
+        setCurrentView('autoplay');
+        setCurrentAutoPlayCard(cardIndex);
+
+        console.log(`播放卡片 ${cardIndex + 1}/${selectedCards.length}`);
+
+        // 執行腳本中的每個步驟
+        for (let stepIndex = 0; stepIndex < autoPlayScript.length; stepIndex++) {
+          if (!isAutoPlaying) break;
+
+          setCurrentAutoPlayStep(stepIndex);
+          const step = autoPlayScript[stepIndex];
+
+          await executeAutoPlayStep(card, step);
+        }
+
+        cardIndex++;
+
+        if (cardIndex >= selectedCards.length) {
+          if (autoPlayMode === 'loop') {
+            cardIndex = 0;
+          } else {
+            break;
+          }
+        }
+
+      } while (isAutoPlaying && (autoPlayMode === 'loop' || cardIndex < selectedCards.length));
+
+      console.log('子資料夾播放完成');
+
+    } catch (error) {
+      console.error('子資料夾播放錯誤:', error);
+      alert('播放發生錯誤: ' + error.message);
+    } finally {
+      setIsAutoPlaying(false);
+      setCurrentAutoPlayCard(0);
+      setCurrentAutoPlayStep(0);
+      setCurrentView('folder');
+    }
+  }, [currentFolder, selectedSubFolders, autoPlayScript, autoPlayMode, isAutoPlaying, executeAutoPlayStep]);
+
   // 隨機播放功能
   const startRandomPlayback = useCallback(async () => {
     const cards = currentFolder?.cards || [];
@@ -4116,12 +5590,40 @@ const FullFlashcardApp = () => {
             <span style={{ fontSize: '32px' }}>{currentFolder.icon}</span>
             <h1 style={{ fontSize: '28px', fontWeight: 'bold' }}>{currentFolder.name}</h1>
           </div>
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{
+            display: 'flex',
+            gap: isMobile ? '8px' : '10px',
+            flexWrap: 'wrap',
+            justifyContent: isMobile ? 'center' : 'flex-start'
+          }}>
+            <button
+              onClick={() => setShowGroupDialog(true)}
+              disabled={currentFolder.cards.length === 0}
+              title="建立子資料夾"
+              style={{
+                ...styles.button,
+                backgroundColor: currentFolder.cards.length === 0 ? '#d1d5db' : '#8b5cf6',
+                minWidth: isMobile ? '44px' : '50px',
+                padding: isMobile ? '12px' : '10px 16px',
+                fontSize: isMobile ? '22px' : '20px',
+                fontWeight: '400'
+              }}
+            >
+              ⊕
+            </button>
             <button
               onClick={() => setShowSpreadsheet(true)}
-              style={{ ...styles.button, backgroundColor: '#7c3aed' }}
+              title="試算表編輯"
+              style={{
+                ...styles.button,
+                backgroundColor: '#7c3aed',
+                minWidth: isMobile ? '44px' : '50px',
+                padding: isMobile ? '12px' : '10px 16px',
+                fontSize: isMobile ? '22px' : '20px',
+                fontWeight: '400'
+              }}
             >
-▦ 試算表編輯
+              ☰
             </button>
             <button
               onClick={() => {
@@ -4131,12 +5633,17 @@ const FullFlashcardApp = () => {
                 }
               }}
               disabled={currentFolder.cards.length === 0}
-              style={{ 
-                ...styles.button, 
-                backgroundColor: currentFolder.cards.length === 0 ? '#d1d5db' : '#2563eb'
+              title="開始學習"
+              style={{
+                ...styles.button,
+                backgroundColor: currentFolder.cards.length === 0 ? '#d1d5db' : '#2563eb',
+                minWidth: isMobile ? '44px' : '50px',
+                padding: isMobile ? '12px' : '10px 16px',
+                fontSize: isMobile ? '22px' : '20px',
+                fontWeight: '400'
               }}
             >
-▶ 開始學習
+              ▶
             </button>
             <button
               onClick={() => {
@@ -4144,12 +5651,17 @@ const FullFlashcardApp = () => {
                 setShowAutoPlayEditor(true);
               }}
               disabled={currentFolder.cards.length === 0}
-              style={{ 
-                ...styles.button, 
-                backgroundColor: '#f59e0b'
+              title="自動播放設定"
+              style={{
+                ...styles.button,
+                backgroundColor: '#f59e0b',
+                minWidth: isMobile ? '44px' : '50px',
+                padding: isMobile ? '12px' : '10px 16px',
+                fontSize: isMobile ? '22px' : '20px',
+                fontWeight: '400'
               }}
             >
-🎭 自動播放設定
+              ⚙
             </button>
             <button
               onClick={() => {
@@ -4163,12 +5675,17 @@ const FullFlashcardApp = () => {
                 }
               }}
               disabled={currentFolder.cards.length === 0}
-              style={{ 
-                ...styles.button, 
-                backgroundColor: isAutoPlaying ? '#dc2626' : '#10b981'
+              title={isAutoPlaying ? `停止播放 (${currentAutoPlayCard + 1}/${currentFolder.cards.length})` : '自動播放'}
+              style={{
+                ...styles.button,
+                backgroundColor: isAutoPlaying ? '#dc2626' : '#10b981',
+                minWidth: isMobile ? '44px' : '50px',
+                padding: isMobile ? '12px' : '10px 16px',
+                fontSize: isMobile ? '22px' : '20px',
+                fontWeight: '400'
               }}
             >
-{isAutoPlaying ? `⏹ 停止播放 ${currentAutoPlayCard + 1}/${currentFolder.cards.length}` : '🎭 自動播放'}
+              {isAutoPlaying ? '■' : '▶'}
             </button>
             <button
               onClick={() => {
@@ -4176,60 +5693,200 @@ const FullFlashcardApp = () => {
                 startRandomPlayback();
               }}
               disabled={currentFolder.cards.length === 0 || isPlaying}
-              style={{ 
-                ...styles.button, 
-                backgroundColor: isPlaying ? '#9ca3af' : '#10b981'
+              title={isPlaying ? '播放中...' : '隨機播放'}
+              style={{
+                ...styles.button,
+                backgroundColor: isPlaying ? '#9ca3af' : '#10b981',
+                minWidth: isMobile ? '44px' : '50px',
+                padding: isMobile ? '12px' : '10px 16px',
+                fontSize: isMobile ? '22px' : '20px',
+                fontWeight: '400'
               }}
             >
-🎲 {isPlaying ? '播放中...' : '隨機播放'}
+              ⊙
             </button>
             {isPlaying && (
               <button
                 onClick={stopPlayback}
-                style={{ 
-                  ...styles.buttonRed, 
-                  padding: '10px 16px'
+                title="停止播放"
+                style={{
+                  ...styles.buttonRed,
+                  minWidth: isMobile ? '44px' : '50px',
+                  padding: isMobile ? '12px' : '10px 16px',
+                  fontSize: isMobile ? '22px' : '20px',
+                  fontWeight: '400'
                 }}
               >
-                ⏹️ 停止
+                ■
               </button>
             )}
           </div>
         </div>
 
-        <div style={styles.grid}>
-          {currentFolder.cards.map(card => (
-            <div key={card.id} style={styles.card}>
-              <div style={{ marginBottom: '15px' }}>
-                <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '5px' }}>
-                  <KanjiWithFurigana text={card.fields.kanji || '未命名'} showFurigana={settings.showFurigana} />
-                </h3>
-                <p style={{ color: '#6b7280' }}>{card.fields.meaning}</p>
-                <p style={{ fontSize: '12px', color: '#9ca3af' }}>{card.fields.level}</p>
-              </div>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button
-                  onClick={() => {
-                    setCurrentCard(card);
-                    executeScript(card, 0);
-                  }}
-                  style={{ ...styles.button, flex: 1 }}
-                >
-  ▶ 播放
-                </button>
-                <button
-                  onClick={() => {
-                    setCurrentCard(card);
-                    setCurrentPageIndex(0);
-                    setCurrentView('study');
-                  }}
-                  style={{ ...styles.buttonGray, flex: 1 }}
-                >
-  ◉ 學習
-                </button>
-              </div>
+        {/* 子資料夾顯示區域 */}
+        {currentFolder.subFolders && currentFolder.subFolders.length > 0 && (
+          <div style={{ marginTop: '24px', marginBottom: '24px' }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '16px'
+            }}>
+              <h2 style={{ fontSize: '20px', fontWeight: '600', color: '#1f2937' }}>
+                📁 子資料夾 ({currentFolder.subFolders.length})
+              </h2>
+              <button
+                onClick={() => {
+                  // 選擇全部/取消全部
+                  if (selectedSubFolders.length === currentFolder.subFolders.length) {
+                    setSelectedSubFolders([]);
+                  } else {
+                    setSelectedSubFolders(currentFolder.subFolders.map(sf => sf.id));
+                  }
+                }}
+                style={{
+                  padding: '8px 16px',
+                  fontSize: '14px',
+                  borderRadius: '6px',
+                  border: '1px solid #e5e7eb',
+                  backgroundColor: 'white',
+                  color: '#4F46E5',
+                  cursor: 'pointer',
+                  fontWeight: '600'
+                }}
+              >
+                {selectedSubFolders.length === currentFolder.subFolders.length ? '取消全選' : '全選'}
+              </button>
             </div>
-          ))}
+
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+              gap: '12px'
+            }}>
+              {currentFolder.subFolders.map(subFolder => (
+                <div
+                  key={subFolder.id}
+                  onClick={() => {
+                    const isSelected = selectedSubFolders.includes(subFolder.id);
+                    if (isSelected) {
+                      setSelectedSubFolders(selectedSubFolders.filter(id => id !== subFolder.id));
+                    } else {
+                      setSelectedSubFolders([...selectedSubFolders, subFolder.id]);
+                    }
+                  }}
+                  style={{
+                    padding: '16px',
+                    borderRadius: '10px',
+                    border: selectedSubFolders.includes(subFolder.id)
+                      ? '3px solid #4F46E5'
+                      : '2px solid #e5e7eb',
+                    backgroundColor: selectedSubFolders.includes(subFolder.id)
+                      ? '#eef2ff'
+                      : 'white',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    position: 'relative'
+                  }}
+                >
+                  {selectedSubFolders.includes(subFolder.id) && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '8px',
+                      right: '8px',
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      backgroundColor: '#4F46E5',
+                      color: 'white',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '14px',
+                      fontWeight: 'bold'
+                    }}>
+                      ✓
+                    </div>
+                  )}
+                  <div style={{ fontWeight: '600', color: '#1f2937', marginBottom: '4px' }}>
+                    {subFolder.name}
+                  </div>
+                  <div style={{ fontSize: '14px', color: '#6b7280' }}>
+                    {subFolder.cards.length} 張卡片
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {selectedSubFolders.length > 0 && (
+              <div style={{ marginTop: '16px', display: 'flex', gap: '10px' }}>
+                <button
+                  onClick={() => {
+                    console.log('自動播放選中的子資料夾:', selectedSubFolders);
+                    startAutoPlayWithSubFolders();
+                  }}
+                  style={{
+                    ...styles.button,
+                    backgroundColor: '#10b981'
+                  }}
+                >
+                  🎭 播放選中的子資料夾 ({selectedSubFolders.length})
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div style={styles.grid}>
+          {currentFolder.cards.map(card => {
+            // 動態獲取欄位定義
+            const fields = getCurrentFields();
+            const sortedFieldKeys = Object.entries(fields)
+              .sort((a, b) => (a[1].order ?? 0) - (b[1].order ?? 0))
+              .map(([key]) => key);
+
+            // 取前3個欄位來顯示(如果有的話)
+            const field1Key = sortedFieldKeys[0];
+            const field2Key = sortedFieldKeys[1];
+            const field3Key = sortedFieldKeys[2];
+
+            const displayText1 = field1Key ? (card.fields[field1Key] || '未命名') : '未命名';
+            const displayText2 = field2Key ? card.fields[field2Key] : '';
+            const displayText3 = field3Key ? card.fields[field3Key] : '';
+
+            return (
+              <div key={card.id} style={styles.card}>
+                <div style={{ marginBottom: '15px' }}>
+                  <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '5px' }}>
+                    <KanjiWithFurigana text={displayText1} showFurigana={settings.showFurigana} />
+                  </h3>
+                  {displayText2 && <p style={{ color: '#6b7280' }}>{displayText2}</p>}
+                  {displayText3 && <p style={{ fontSize: '12px', color: '#9ca3af' }}>{displayText3}</p>}
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    onClick={() => {
+                      setCurrentCard(card);
+                      executeScript(card, 0);
+                    }}
+                    style={{ ...styles.button, flex: 1 }}
+                  >
+    ▶ 播放
+                  </button>
+                  <button
+                    onClick={() => {
+                      setCurrentCard(card);
+                      setCurrentPageIndex(0);
+                      setCurrentView('study');
+                    }}
+                    style={{ ...styles.buttonGray, flex: 1 }}
+                  >
+    ◉ 學習
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         {currentFolder.cards.length === 0 && (
@@ -4243,7 +5900,7 @@ const FullFlashcardApp = () => {
         {showSpreadsheet && <SpreadsheetEditor />}
         {showFieldEditor && <FieldEditor />}
         {showImportDialog && <ImportDialog />}
-        {showTTSSettings && <TTSSettingsDialog />}
+        {showFieldSelector && <FieldSelectorDialog />}
         {showTemplateEditor && <TemplateEditor />}
         {/* 語音風格編輯器對話框 */}
         {showVoiceStyleEditor && (
@@ -4494,53 +6151,72 @@ const FullFlashcardApp = () => {
             智能語音閃卡，讓日語學習更有效率
           </p>
           
-          <div style={{ 
-            display: 'flex', 
+          <div style={{
+            display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
             gap: '12px',
             justifyContent: 'center',
-            flexWrap: 'wrap'
+            flexWrap: isMobile ? 'nowrap' : 'wrap',
+            maxWidth: isMobile ? '100%' : 'none'
           }}>
             <button
-              onClick={() => setShowTTSSettings(true)}
-              style={{ ...styles.button, backgroundColor: '#dc2626', position: 'relative' }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('語音設定按鈕被點擊了!', settings);
+                setShowTTSSettings(true);
+              }}
+              style={{
+                ...styles.button,
+                backgroundColor: '#dc2626',
+                position: 'relative',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                pointerEvents: 'auto',
+                zIndex: 10,
+                flex: isMobile ? 1 : 'auto',
+                width: isMobile ? '100%' : 'auto'
+              }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span>⚙ 語音設定</span>
-                <span style={{ 
-                  fontSize: '10px', 
-                  padding: '2px 6px', 
-                  borderRadius: '10px',
-                  backgroundColor: 'rgba(255,255,255,0.2)',
-                  color: 'white'
-                }}>
-                  {settings.azureTTS.enabled && settings.azureTTS.subscriptionKey ? 'Azure' : '預設'}
-                </span>
-              </div>
+              <span>⚙ 語音設定</span>
+              <span style={{
+                fontSize: '10px',
+                padding: '2px 6px',
+                borderRadius: '10px',
+                backgroundColor: 'rgba(255,255,255,0.2)',
+                color: 'white',
+                pointerEvents: 'none'
+              }}>
+                {settings.azureTTS.enabled && settings.azureTTS.subscriptionKey ? 'Azure' : '預設'}
+              </span>
             </button>
             <button
               onClick={() => setShowNewFolder(true)}
-              style={styles.button}
+              style={{ ...styles.button, flex: isMobile ? 1 : 'auto', width: isMobile ? '100%' : 'auto' }}
             >
 + 新增資料夾
             </button>
-            
+
             <button
               onClick={exportAllData}
-              style={{ ...styles.button, backgroundColor: '#10B981' }}
+              style={{ ...styles.button, backgroundColor: '#10B981', flex: isMobile ? 1 : 'auto', width: isMobile ? '100%' : 'auto' }}
             >
               💾 下載備份
             </button>
-            
+
             <button
               onClick={() => document.getElementById('restoreInput').click()}
-              style={{ ...styles.button, backgroundColor: '#7C3AED' }}
+              style={{ ...styles.button, backgroundColor: '#7C3AED', flex: isMobile ? 1 : 'auto', width: isMobile ? '100%' : 'auto' }}
             >
               📱 恢復數據
             </button>
-            
+
             <button
               onClick={autoCloudSync}
-              style={{ ...styles.button, backgroundColor: '#FF6B35' }}
+              style={{ ...styles.button, backgroundColor: '#FF6B35', flex: isMobile ? 1 : 'auto', width: isMobile ? '100%' : 'auto' }}
             >
               ☁️ 自動雲端同步
             </button>
@@ -4726,7 +6402,10 @@ const FullFlashcardApp = () => {
       {currentView === 'folder' && currentFolder && <FolderView />}
       {currentView === 'study' && currentFolder && <StudyView />}
       {currentView === 'autoplay' && currentFolder && <AutoPlayView />}
-      
+
+      {/* 全域對話框 - 可在任何視圖打開 */}
+      {showTTSSettings && <TTSSettingsDialog />}
+
       {/* 播放設定（三分頁系統）*/}
       {showAutoPlayEditor && (
         <div 
@@ -4762,9 +6441,72 @@ const FullFlashcardApp = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0 }}>⚙️ 播放設定</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                <h3 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0 }}>⚙️ 播放設定</h3>
+                {/* 顯示模式切換 */}
+                <div style={{
+                  display: 'flex',
+                  gap: '5px',
+                  backgroundColor: '#f3f4f6',
+                  borderRadius: '8px',
+                  padding: '4px'
+                }}>
+                  <button
+                    onClick={() => setCardDisplayMode('card')}
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: '13px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      backgroundColor: cardDisplayMode === 'card' ? 'white' : 'transparent',
+                      color: cardDisplayMode === 'card' ? '#4F46E5' : '#6b7280',
+                      cursor: 'pointer',
+                      fontWeight: cardDisplayMode === 'card' ? '600' : '400',
+                      boxShadow: cardDisplayMode === 'card' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    🃏 卡片
+                  </button>
+                  <button
+                    onClick={() => setCardDisplayMode('table')}
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: '13px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      backgroundColor: cardDisplayMode === 'table' ? 'white' : 'transparent',
+                      color: cardDisplayMode === 'table' ? '#4F46E5' : '#6b7280',
+                      cursor: 'pointer',
+                      fontWeight: cardDisplayMode === 'table' ? '600' : '400',
+                      boxShadow: cardDisplayMode === 'table' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    📊 表格
+                  </button>
+                </div>
+              </div>
               <div style={{ display: 'flex', gap: '10px' }}>
-                <button 
+                <button
+                  type="button"
+                  onClick={() => setDesignMode(!designMode)}
+                  style={{
+                    padding: '8px 16px',
+                    fontSize: '14px',
+                    borderRadius: '6px',
+                    border: designMode ? '2px solid #4F46E5' : '1px solid #d1d5db',
+                    backgroundColor: designMode ? '#4F46E5' : 'white',
+                    color: designMode ? 'white' : '#374151',
+                    cursor: 'pointer',
+                    fontWeight: designMode ? '600' : '400',
+                    transition: 'all 0.2s'
+                  }}
+                  title="開啟設計模式來自訂元素樣式"
+                >
+                  {designMode ? '🎨 設計模式中' : '🎨 設計模式'}
+                </button>
+                <button
                   type="button"
                   onClick={() => setShowAutoPlayEditor(false)}
                   style={{
@@ -4830,22 +6572,6 @@ const FullFlashcardApp = () => {
                 }}
               >
                 📱 頁面設定
-              </button>
-              <button
-                onClick={() => setCurrentPlaySettingTab('voice')}
-                style={{
-                  padding: '12px 24px',
-                  fontSize: '14px',
-                  fontWeight: 'bold',
-                  border: 'none',
-                  backgroundColor: 'transparent',
-                  color: currentPlaySettingTab === 'voice' ? '#3b82f6' : '#6b7280',
-                  borderBottom: currentPlaySettingTab === 'voice' ? '2px solid #3b82f6' : '2px solid transparent',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                🎵 語音設定
               </button>
             </div>
 
@@ -5397,10 +7123,179 @@ const FullFlashcardApp = () => {
                                 </div>
                               </div>
 
+                              {/* 欄位樣式設定區 */}
+                              {template.fields.length > 0 && (
+                                <div style={{ marginBottom: '15px', padding: '12px', backgroundColor: '#f9fafb', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
+                                  <div style={{ fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '10px' }}>欄位樣式設定</div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                    {template.fields.map(fieldKey => {
+                                      const fieldStyle = template.fieldStyles[fieldKey] || { fontSize: 24, fontFamily: 'sans-serif', textAlign: 'center' };
+                                      const fieldConfig = getCurrentFields()[fieldKey];
+                                      return (
+                                        <div key={fieldKey} style={{ padding: '10px', backgroundColor: 'white', borderRadius: '4px', border: '1px solid #e5e7eb' }}>
+                                          <div style={{ fontSize: '13px', fontWeight: '600', color: '#3b82f6', marginBottom: '8px' }}>
+                                            {fieldConfig?.label || fieldKey}
+                                          </div>
+
+                                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                                            {/* 字型大小 */}
+                                            <div>
+                                              <label style={{ fontSize: '11px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>
+                                                字型大小：{fieldStyle.fontSize}px
+                                              </label>
+                                              <input
+                                                type="range"
+                                                min="12"
+                                                max="72"
+                                                value={fieldStyle.fontSize}
+                                                onChange={(e) => {
+                                                  setDisplayTemplates(prev => ({
+                                                    ...prev,
+                                                    [templateId]: {
+                                                      ...prev[templateId],
+                                                      fieldStyles: {
+                                                        ...prev[templateId].fieldStyles,
+                                                        [fieldKey]: {
+                                                          ...fieldStyle,
+                                                          fontSize: parseInt(e.target.value)
+                                                        }
+                                                      }
+                                                    }
+                                                  }));
+                                                }}
+                                                style={{ width: '100%' }}
+                                              />
+                                            </div>
+
+                                            {/* 字型選擇 */}
+                                            <div>
+                                              <label style={{ fontSize: '11px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>字型</label>
+                                              <select
+                                                value={fieldStyle.fontFamily}
+                                                onChange={(e) => {
+                                                  setDisplayTemplates(prev => ({
+                                                    ...prev,
+                                                    [templateId]: {
+                                                      ...prev[templateId],
+                                                      fieldStyles: {
+                                                        ...prev[templateId].fieldStyles,
+                                                        [fieldKey]: {
+                                                          ...fieldStyle,
+                                                          fontFamily: e.target.value
+                                                        }
+                                                      }
+                                                    }
+                                                  }));
+                                                }}
+                                                style={{ width: '100%', padding: '4px 6px', fontSize: '12px', border: '1px solid #d1d5db', borderRadius: '4px' }}
+                                              >
+                                                <option value="sans-serif">無襯線</option>
+                                                <option value="serif">襯線</option>
+                                                <option value="monospace">等寬</option>
+                                                <option value="'Noto Sans JP', sans-serif">日文字型</option>
+                                              </select>
+                                            </div>
+
+                                            {/* 對齊方式 */}
+                                            <div>
+                                              <label style={{ fontSize: '11px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>對齊</label>
+                                              <div style={{ display: 'flex', gap: '4px' }}>
+                                                {['left', 'center', 'right'].map(align => (
+                                                  <button
+                                                    key={align}
+                                                    onClick={() => {
+                                                      setDisplayTemplates(prev => ({
+                                                        ...prev,
+                                                        [templateId]: {
+                                                          ...prev[templateId],
+                                                          fieldStyles: {
+                                                            ...prev[templateId].fieldStyles,
+                                                            [fieldKey]: {
+                                                              ...fieldStyle,
+                                                              textAlign: align
+                                                            }
+                                                          }
+                                                        }
+                                                      }));
+                                                    }}
+                                                    style={{
+                                                      flex: 1,
+                                                      padding: '4px',
+                                                      fontSize: '11px',
+                                                      border: '1px solid #d1d5db',
+                                                      borderRadius: '4px',
+                                                      backgroundColor: fieldStyle.textAlign === align ? '#3b82f6' : 'white',
+                                                      color: fieldStyle.textAlign === align ? 'white' : '#374151',
+                                                      cursor: 'pointer'
+                                                    }}
+                                                  >
+                                                    {align === 'left' ? '←' : align === 'center' ? '↔' : '→'}
+                                                  </button>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* 頁面頂部欄位設定 */}
+                              <div style={{ marginBottom: '15px', padding: '12px', backgroundColor: '#fffbeb', borderRadius: '6px', border: '1px solid #fbbf24' }}>
+                                <div style={{ fontSize: '14px', fontWeight: '500', color: '#92400e', marginBottom: '8px' }}>
+                                  頁面頂部顯示欄位（最多3個）
+                                </div>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                  {Object.entries(getCurrentFields()).map(([fieldKey, fieldConfig]) => {
+                                    const isSelected = template.topFields?.includes(fieldKey);
+                                    const canSelect = !isSelected && (template.topFields?.length || 0) < 3;
+                                    return (
+                                      <label
+                                        key={fieldKey}
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          padding: '4px 8px',
+                                          backgroundColor: isSelected ? '#fbbf24' : '#fef3c7',
+                                          borderRadius: '4px',
+                                          cursor: canSelect || isSelected ? 'pointer' : 'not-allowed',
+                                          fontSize: '11px',
+                                          border: isSelected ? '1px solid #f59e0b' : '1px solid #fde68a',
+                                          opacity: canSelect || isSelected ? 1 : 0.5
+                                        }}
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={isSelected}
+                                          disabled={!canSelect && !isSelected}
+                                          onChange={(e) => {
+                                            const newTopFields = e.target.checked
+                                              ? [...(template.topFields || []), fieldKey]
+                                              : (template.topFields || []).filter(f => f !== fieldKey);
+                                            setDisplayTemplates(prev => ({
+                                              ...prev,
+                                              [templateId]: {
+                                                ...prev[templateId],
+                                                topFields: newTopFields
+                                              }
+                                            }));
+                                          }}
+                                          style={{ margin: 0 }}
+                                        />
+                                        {fieldConfig.label}
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <label style={{ 
-                                  display: 'flex', 
-                                  alignItems: 'center', 
+                                <label style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
                                   gap: '6px',
                                   fontSize: '14px',
                                   fontWeight: '500',
@@ -5460,27 +7355,79 @@ const FullFlashcardApp = () => {
                                 </button>
                               </div>
                               <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}>
-                                預覽：{template.fields.length > 0 ? template.fields.map(fieldKey => getCurrentFields()[fieldKey]?.label || fieldKey).join(' | ') : '無欄位'}
+                                欄位：{template.fields.length > 0 ? template.fields.map(fieldKey => getCurrentFields()[fieldKey]?.label || fieldKey).join(' | ') : '無欄位'}
+                                {template.topFields && template.topFields.length > 0 && (
+                                  <div style={{ marginTop: '4px', color: '#92400e' }}>
+                                    頂部：{template.topFields.map(fieldKey => getCurrentFields()[fieldKey]?.label || fieldKey).join(', ')}
+                                  </div>
+                                )}
                               </div>
                               {currentFolder?.cards?.[0] && (
-                                <div style={{ 
-                                  padding: '10px',
+                                <div style={{
+                                  padding: '12px',
                                   backgroundColor: '#f8fafc',
                                   borderRadius: '4px',
-                                  border: '1px solid #e2e8f0',
-                                  fontSize: '14px'
+                                  border: '1px solid #e2e8f0'
                                 }}>
+                                  {/* 頂部欄位預覽 */}
+                                  {template.topFields && template.topFields.length > 0 && (
+                                    <div style={{
+                                      display: 'flex',
+                                      justifyContent: 'space-around',
+                                      padding: '8px',
+                                      backgroundColor: '#fffbeb',
+                                      borderRadius: '4px',
+                                      marginBottom: '10px',
+                                      gap: '6px',
+                                      border: '1px solid #fbbf24'
+                                    }}>
+                                      {template.topFields.map((fieldKey) => {
+                                        const fieldValue = currentFolder.cards[0].fields[fieldKey];
+                                        const field = getCurrentFields()[fieldKey];
+                                        if (!fieldValue) return null;
+
+                                        return (
+                                          <div key={fieldKey} style={{ textAlign: 'center', flex: 1 }}>
+                                            <div style={{ fontSize: '9px', color: '#92400e', marginBottom: '2px' }}>
+                                              {field?.label || fieldKey}
+                                            </div>
+                                            <div style={{ fontSize: '10px', color: '#78350f', fontWeight: '600' }}>
+                                              {fieldValue.replace(/\[.*?\]/g, '')}
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+
+                                  {/* 主要欄位預覽 */}
                                   {template.fields.map((fieldKey, index) => {
                                     const fieldValue = currentFolder.cards[0].fields[fieldKey];
                                     if (!fieldValue) return null;
-                                    
-                                    const displayValue = template.showFurigana ? 
-                                      fieldValue : 
+
+                                    const displayValue = template.showFurigana ?
+                                      fieldValue :
                                       fieldValue.replace(/\[.*?\]/g, '');
-                                    
+
+                                    const fieldStyle = template.fieldStyles?.[fieldKey] || { fontSize: 14, fontFamily: 'sans-serif', textAlign: 'center' };
+                                    // 預覽時縮小字型大小
+                                    const previewFontSize = Math.max(10, Math.min(fieldStyle.fontSize * 0.5, 18));
+
                                     return (
-                                      <div key={fieldKey} style={{ marginBottom: index < template.fields.length - 1 ? '5px' : 0 }}>
-                                        <span style={{ fontWeight: '500' }}>{displayValue}</span>
+                                      <div
+                                        key={fieldKey}
+                                        style={{
+                                          marginBottom: index < template.fields.length - 1 ? '6px' : 0,
+                                          textAlign: fieldStyle.textAlign
+                                        }}
+                                      >
+                                        <span style={{
+                                          fontWeight: '500',
+                                          fontSize: `${previewFontSize}px`,
+                                          fontFamily: fieldStyle.fontFamily
+                                        }}>
+                                          {displayValue}
+                                        </span>
                                       </div>
                                     );
                                   })}
@@ -5491,231 +7438,6 @@ const FullFlashcardApp = () => {
                         </div>
                       </div>
                     </div>
-                  </div>
-                </div>
-              )}
-
-              {/* 分頁3: 語音設定 */}
-              {currentPlaySettingTab === 'voice' && (
-                <div style={{ 
-                  height: '100%', 
-                  display: 'flex', 
-                  flexDirection: 'column',
-                  overflow: 'hidden'
-                }}>
-                  {/* 固定頭部區域 */}
-                  <div style={{ flexShrink: 0 }}>
-                    <h4 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '10px', color: '#3b82f6' }}>🎵 語音設定</h4>
-                    <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '15px' }}>設定每個欄位的預設語音參數（語速、重複次數等）</p>
-                  </div>
-                  
-                  {/* 可滾動內容區域 */}
-                  <div style={{ 
-                    flex: 1, 
-                    overflowY: 'auto', 
-                    border: '1px solid #e5e7eb', 
-                    borderRadius: '6px', 
-                    padding: '15px',
-                    backgroundColor: '#f0fdf4'
-                  }}>
-                    {/* 為每個欄位設定語音參數 */}
-                    {Object.entries(getCurrentFields()).map(([fieldKey, fieldConfig]) => {
-                      const voiceSettings = fieldVoiceSettings[fieldKey] || {
-                        voice: 'zh-TW-HsiaoChenNeural',
-                        rate: 1.0,
-                        pitch: 1.0,
-                        style: 'neutral'
-                      };
-
-                      return (
-                        <div key={fieldKey} style={{ 
-                          marginBottom: '25px',
-                          padding: '20px',
-                          backgroundColor: 'white',
-                          borderRadius: '8px',
-                          border: '1px solid #d1d5db',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                        }}>
-                          <h4 style={{ 
-                            fontSize: '16px', 
-                            fontWeight: 'bold', 
-                            marginBottom: '15px',
-                            color: '#1f2937',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                          }}>
-                            🔊 {fieldConfig.label} 語音設定
-                          </h4>
-
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-                            {/* 左欄：語音選擇和風格 */}
-                            <div>
-                              <div style={{ marginBottom: '12px' }}>
-                                <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#374151', marginBottom: '6px', display: 'block' }}>🎭 語音角色</label>
-                                <select
-                                  value={voiceSettings.voice}
-                                  onChange={(e) => {
-                                    setFieldVoiceSettings(prev => ({
-                                      ...prev,
-                                      [fieldKey]: { ...voiceSettings, voice: e.target.value }
-                                    }));
-                                  }}
-                                  style={{ 
-                                    width: '100%',
-                                    padding: '8px 12px',
-                                    fontSize: '13px',
-                                    borderRadius: '6px',
-                                    border: '2px solid #10b981',
-                                    backgroundColor: '#f0fdf4'
-                                  }}
-                                >
-                                  {/* 中文語音 */}
-                                  <optgroup label="中文語音">
-                                    {AZURE_VOICES['zh-TW'].map(voice => (
-                                      <option key={voice.value} value={voice.value}>{voice.label}</option>
-                                    ))}
-                                  </optgroup>
-                                  {/* 日文語音 */}
-                                  <optgroup label="日文語音">
-                                    {AZURE_VOICES['ja-JP'].map(voice => (
-                                      <option key={voice.value} value={voice.value}>{voice.label}</option>
-                                    ))}
-                                  </optgroup>
-                                  {/* 英文語音 */}
-                                  <optgroup label="英文語音">
-                                    {AZURE_VOICES['en-US'].map(voice => (
-                                      <option key={voice.value} value={voice.value}>{voice.label}</option>
-                                    ))}
-                                  </optgroup>
-                                </select>
-                              </div>
-
-                              <div>
-                                <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#374151', marginBottom: '6px', display: 'block' }}>😊 語音情緒</label>
-                                <select
-                                  value={voiceSettings.style}
-                                  onChange={(e) => {
-                                    setFieldVoiceSettings(prev => ({
-                                      ...prev,
-                                      [fieldKey]: { ...voiceSettings, style: e.target.value }
-                                    }));
-                                  }}
-                                  style={{ 
-                                    width: '100%',
-                                    padding: '8px 12px',
-                                    fontSize: '13px',
-                                    borderRadius: '6px',
-                                    border: '2px solid #3b82f6',
-                                    backgroundColor: '#eff6ff'
-                                  }}
-                                >
-                                  {EMOTION_STYLES.map(style => (
-                                    <option key={style.value} value={style.value}>{style.label}</option>
-                                  ))}
-                                </select>
-                              </div>
-                            </div>
-
-                            {/* 右欄：語速和音調 */}
-                            <div>
-                              <div style={{ marginBottom: '12px' }}>
-                                <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#374151', marginBottom: '6px', display: 'block' }}>⚡ 語速 ({voiceSettings.rate}x)</label>
-                                <input
-                                  type="range"
-                                  min="0.5"
-                                  max="2.0"
-                                  step="0.1"
-                                  value={voiceSettings.rate}
-                                  onChange={(e) => {
-                                    setFieldVoiceSettings(prev => ({
-                                      ...prev,
-                                      [fieldKey]: { ...voiceSettings, rate: parseFloat(e.target.value) }
-                                    }));
-                                  }}
-                                  style={{ 
-                                    width: '100%',
-                                    marginBottom: '4px'
-                                  }}
-                                />
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280' }}>
-                                  <span>慢 (0.5x)</span>
-                                  <span>標準 (1.0x)</span>
-                                  <span>快 (2.0x)</span>
-                                </div>
-                              </div>
-
-                              <div>
-                                <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#374151', marginBottom: '6px', display: 'block' }}>🎵 音調 ({voiceSettings.pitch}x)</label>
-                                <input
-                                  type="range"
-                                  min="0.5"
-                                  max="2.0"
-                                  step="0.1"
-                                  value={voiceSettings.pitch}
-                                  onChange={(e) => {
-                                    setFieldVoiceSettings(prev => ({
-                                      ...prev,
-                                      [fieldKey]: { ...voiceSettings, pitch: parseFloat(e.target.value) }
-                                    }));
-                                  }}
-                                  style={{ 
-                                    width: '100%',
-                                    marginBottom: '4px'
-                                  }}
-                                />
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280' }}>
-                                  <span>低 (0.5x)</span>
-                                  <span>標準 (1.0x)</span>
-                                  <span>高 (2.0x)</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* 測試按鈕 */}
-                          <div style={{ marginTop: '15px', textAlign: 'center' }}>
-                            <button
-                              onClick={async () => {
-                                // 測試這個欄位的語音設定
-                                if (currentFolder?.cards?.length > 0) {
-                                  const testText = currentFolder.cards[0].fields[fieldKey];
-                                  if (testText) {
-                                    try {
-                                      await speak(testText, {
-                                        voice: voiceSettings.voice,
-                                        rate: voiceSettings.rate,
-                                        pitch: voiceSettings.pitch,
-                                        style: voiceSettings.style
-                                      });
-                                    } catch (error) {
-                                      console.error('語音測試錯誤:', error);
-                                    }
-                                  } else {
-                                    alert(`${fieldConfig.label} 欄位沒有內容可以測試`);
-                                  }
-                                } else {
-                                  alert('沒有卡片可以測試語音');
-                                }
-                              }}
-                              style={{
-                                padding: '8px 16px',
-                                fontSize: '13px',
-                                fontWeight: 'bold',
-                                borderRadius: '6px',
-                                border: 'none',
-                                backgroundColor: '#f59e0b',
-                                color: 'white',
-                                cursor: 'pointer',
-                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                              }}
-                            >
-                              🎤 測試語音
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
                   </div>
                 </div>
               )}
@@ -5738,54 +7460,64 @@ const FullFlashcardApp = () => {
                   borderBottomLeftRadius: '12px',
                   borderBottomRightRadius: '12px'
                 }}>
-                  <button
-                  onClick={async () => {
-                    console.log('🎮 測試播放按鈕被點擊');
-                    
-                    if (currentFolder?.cards?.length > 0) {
-                      const testCard = currentFolder.cards[0];
-                      setCurrentCard(testCard);
-                      setCurrentAutoPlayCard(0);
-                      setCurrentView('autoplay');
-                      setShowAutoPlayEditor(false);
-                      
-                      try {
-                        for (let i = 0; i < autoPlayScript.length; i++) {
-                          const step = autoPlayScript[i];
-                          setCurrentAutoPlayStep(i);
-                          console.log(`測試執行步驟 ${i + 1}/${autoPlayScript.length}:`, step);
-                          await executeAutoPlayStep(testCard, step);
-                          await new Promise(resolve => setTimeout(resolve, 300));
+                  <ClickableWrapper
+                    designMode={designMode}
+                    elementId="test-play-button"
+                    onSelect={setSelectedElement}
+                    isSelected={selectedElement?.id === 'test-play-button'}
+                    customStyle={customStyles['test-play-button']}
+                  >
+                    <button
+                      onClick={async () => {
+                        if (designMode) return; // 設計模式下不執行
+                        console.log('🎮 測試播放按鈕被點擊');
+
+                        if (currentFolder?.cards?.length > 0) {
+                          const testCard = currentFolder.cards[0];
+                          setCurrentCard(testCard);
+                          setCurrentAutoPlayCard(0);
+                          setCurrentView('autoplay');
+                          setShowAutoPlayEditor(false);
+
+                          try {
+                            for (let i = 0; i < autoPlayScript.length; i++) {
+                              const step = autoPlayScript[i];
+                              setCurrentAutoPlayStep(i);
+                              console.log(`測試執行步驟 ${i + 1}/${autoPlayScript.length}:`, step);
+                              await executeAutoPlayStep(testCard, step);
+                              await new Promise(resolve => setTimeout(resolve, 300));
+                            }
+
+                            setTimeout(() => {
+                              setCurrentView('folder');
+                              alert('測試播放完成！');
+                            }, 1000);
+                          } catch (error) {
+                            console.error('測試播放錯誤:', error);
+                            setCurrentView('folder');
+                            alert('測試播放失敗：' + error.message);
+                          }
+                        } else {
+                          alert('沒有可用的卡片進行測試');
                         }
-                        
-                        setTimeout(() => {
-                          setCurrentView('folder');
-                          alert('測試播放完成！');
-                        }, 1000);
-                      } catch (error) {
-                        console.error('測試播放錯誤:', error);
-                        setCurrentView('folder');
-                        alert('測試播放失敗：' + error.message);
-                      }
-                    } else {
-                      alert('沒有可用的卡片進行測試');
-                    }
-                  }}
-                  disabled={currentFolder?.cards?.length === 0}
-                  style={{ 
-                    flex: 1,
-                    padding: '12px 20px',
-                    fontSize: '14px',
-                    fontWeight: 'bold',
-                    borderRadius: '8px',
-                    border: 'none',
-                    backgroundColor: '#f59e0b',
-                    color: 'white',
-                    cursor: 'pointer'
-                  }}
-                >
-                  🎮 測試播放
-                </button>
+                      }}
+                      disabled={currentFolder?.cards?.length === 0 || designMode}
+                      style={{
+                        flex: 1,
+                        padding: '12px 20px',
+                        fontSize: '14px',
+                        fontWeight: 'bold',
+                        borderRadius: '8px',
+                        border: 'none',
+                        backgroundColor: designMode ? '#cbd5e1' : '#f59e0b',
+                        color: 'white',
+                        cursor: designMode ? 'default' : 'pointer',
+                        ...(customStyles['test-play-button'] || {})
+                      }}
+                    >
+                      🎮 測試播放
+                    </button>
+                  </ClickableWrapper>
                 <button
                   onClick={() => {
                     setShowAutoPlayEditor(false);
@@ -6137,49 +7869,98 @@ const FullFlashcardApp = () => {
                 </div>
               
               {/* 右側：預覽 */}
-              <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                <h4 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '15px' }}>播放預覽</h4>
-                <div style={{ padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px', marginBottom: '15px' }}>
-                  <p style={{ fontSize: '14px', color: '#374151', margin: 0 }}>
-                    播放模式：{autoPlayMode === 'sequential' ? '📋 順序播放' : '🔄 循環播放'}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: 0,
+                flex: 1,
+                maxWidth: '400px'
+              }}>
+                <h4 style={{
+                  fontSize: '16px',
+                  fontWeight: '700',
+                  marginBottom: '12px',
+                  color: '#1f2937',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <span>📺</span>
+                  播放預覽
+                </h4>
+                <div style={{
+                  padding: '12px 15px',
+                  backgroundColor: '#eff6ff',
+                  borderRadius: '8px',
+                  marginBottom: '12px',
+                  border: '1px solid #dbeafe'
+                }}>
+                  <p style={{ fontSize: '13px', color: '#1e40af', margin: 0, fontWeight: '600' }}>
+                    {autoPlayMode === 'sequential' ? '📋 順序播放模式' : '🔄 循環播放模式'}
                   </p>
-                  <p style={{ fontSize: '14px', color: '#6b7280', margin: '5px 0 0 0' }}>
-                    總共 {autoPlayScript.length} 個步驟，每張卡片約 {Math.round(autoPlayScript.reduce((total, step) => {
-                      if (step.type === 'speak') {
-                        let speakTime = 1000 * (step.repeat || 1);
-                        if (step.pauseMode === 'sentence') {
-                          // 估算：假設平均句長5字，每字100毫秒基準
-                          const estimatedLength = 5;
-                          const estimatedPause = estimatedLength * 100 * (step.sentenceMultiplier || 1.0);
-                          return total + speakTime + estimatedPause;
-                        } else {
-                          return total + speakTime + (step.pauseAfter || 0);
+                  <p style={{ fontSize: '12px', color: '#3b82f6', margin: '8px 0 0 0', lineHeight: '1.5' }}>
+                    共 <strong>{autoPlayScript.length}</strong> 個步驟 • 預計每張卡片約{' '}
+                    <strong>
+                      {Math.round(autoPlayScript.reduce((total, step) => {
+                        if (step.type === 'speak') {
+                          let speakTime = 1000 * (step.repeat || 1);
+                          if (step.pauseMode === 'sentence') {
+                            // 估算: 假設平均句長5字, 每字100毫秒基準
+                            const estimatedLength = 5;
+                            const estimatedPause = estimatedLength * 100 * (step.sentenceMultiplier || 1.0);
+                            return total + speakTime + estimatedPause;
+                          } else {
+                            return total + speakTime + (step.pauseAfter || 0);
+                          }
                         }
-                      }
-                      if (step.type === 'pause') return total + (step.duration || 1000);
-                      return total;
-                    }, 0) / 1000)} 秒 (模板切換立即，句長暫停為估算)
+                        if (step.type === 'pause') return total + (step.duration || 1000);
+                        return total;
+                      }, 0) / 1000)}
+                    </strong>
+                    {' '}秒
                   </p>
                 </div>
-                
-                <div style={{ 
-                  maxHeight: '400px', 
+
+                <div style={{
+                  flex: 1,
+                  maxHeight: '500px',
                   overflowY: 'auto',
                   border: '1px solid #e5e7eb',
-                  borderRadius: '6px',
-                  padding: '10px',
-                  backgroundColor: '#fefefe'
+                  borderRadius: '8px',
+                  padding: '12px',
+                  backgroundColor: '#ffffff'
                 }}>
-                  <h5 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '10px' }}>腳本流程預覽</h5>
+                  <h5 style={{
+                    fontSize: '13px',
+                    fontWeight: '700',
+                    marginBottom: '12px',
+                    color: '#4b5563',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <span>📜</span>
+                    腳本流程預覽
+                  </h5>
                   {autoPlayScript.map((step, index) => (
-                    <div key={step.id} style={{ 
-                      marginBottom: '8px', 
-                      padding: '10px', 
-                      backgroundColor: 'white', 
+                    <div key={step.id} style={{
+                      marginBottom: '10px',
+                      padding: '10px 12px',
+                      backgroundColor: '#f9fafb',
                       borderRadius: '6px',
                       border: '1px solid #e5e7eb',
-                      fontSize: '12px'
-                    }}>
+                      fontSize: '12px',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f3f4f6';
+                      e.currentTarget.style.borderColor = '#d1d5db';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f9fafb';
+                      e.currentTarget.style.borderColor = '#e5e7eb';
+                    }}
+                    >
                       <div style={{ fontWeight: 'bold', color: '#374151' }}>
                         {index + 1}. {
                           step.type === 'display' ? `📱 顯示模板${step.templateId}` :
@@ -6212,6 +7993,25 @@ const FullFlashcardApp = () => {
       )}
       
       {/* 模板編輯器已整合至播放設定的頁面設定分頁 */}
+
+      {/* 設計編輯器 - 視覺化調整元素樣式 */}
+      {designMode && showAutoPlayEditor && (
+        <DesignEditor
+          selectedElement={selectedElement}
+          onStyleChange={(newStyle) => {
+            if (selectedElement) {
+              setCustomStyles({
+                ...customStyles,
+                [selectedElement.id]: newStyle
+              });
+            }
+          }}
+          onClose={() => setDesignMode(false)}
+        />
+      )}
+
+      {/* 雲端同步對話框 */}
+      {showSyncDialog && <SyncDialog />}
     </div>
   );
 };
