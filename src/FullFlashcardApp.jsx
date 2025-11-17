@@ -6215,10 +6215,10 @@ ${cleanText}
             </button>
 
             <button
-              onClick={autoCloudSync}
+              onClick={() => setShowSyncDialog(true)}
               style={{ ...styles.button, backgroundColor: '#FF6B35', flex: isMobile ? 1 : 'auto', width: isMobile ? '100%' : 'auto' }}
             >
-              ☁️ 自動雲端同步
+              ☁️ 雲端同步設定
             </button>
             
             <input
@@ -6405,6 +6405,7 @@ ${cleanText}
 
       {/* 全域對話框 - 可在任何視圖打開 */}
       {showTTSSettings && <TTSSettingsDialog />}
+      {showSyncDialog && <SyncDialog />}
 
       {/* 播放設定（三分頁系統）*/}
       {showAutoPlayEditor && (

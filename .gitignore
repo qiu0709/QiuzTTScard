@@ -32,3 +32,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+
+# 臨時文件
+temp_apkg/
+*.apkg
+test-*.html
+test-*.js
