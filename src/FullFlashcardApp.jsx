@@ -251,17 +251,45 @@ const FullFlashcardApp = () => {
   const [showTemplateEditor, setShowTemplateEditor] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [currentTemplate, setCurrentTemplate] = useState('A');
-  
-  const [settings, setSettings] = useState({
-    defaultRate: 1.0,
-    showFurigana: true,
-    azureTTS: {
-      enabled: import.meta.env.VITE_AZURE_SPEECH_KEY ? true : false,
-      subscriptionKey: import.meta.env.VITE_AZURE_SPEECH_KEY || '',
-      region: import.meta.env.VITE_AZURE_SPEECH_REGION || 'eastasia',
-      defaultVoice: 'ja-JP-NanamiNeural'
+
+  // 從 localStorage 讀取設定，如果沒有則使用預設值
+  const [settings, setSettings] = useState(() => {
+    const savedSettings = localStorage.getItem('app-settings');
+    if (savedSettings) {
+      try {
+        const parsed = JSON.parse(savedSettings);
+        // 確保結構完整，如果缺少欄位則補上預設值
+        return {
+          defaultRate: parsed.defaultRate || 1.0,
+          showFurigana: parsed.showFurigana !== undefined ? parsed.showFurigana : true,
+          azureTTS: {
+            enabled: parsed.azureTTS?.enabled !== undefined ? parsed.azureTTS.enabled : (import.meta.env.VITE_AZURE_SPEECH_KEY ? true : false),
+            subscriptionKey: parsed.azureTTS?.subscriptionKey || import.meta.env.VITE_AZURE_SPEECH_KEY || '',
+            region: parsed.azureTTS?.region || import.meta.env.VITE_AZURE_SPEECH_REGION || 'eastasia',
+            defaultVoice: parsed.azureTTS?.defaultVoice || 'ja-JP-NanamiNeural'
+          }
+        };
+      } catch (e) {
+        console.error('讀取設定失敗，使用預設值', e);
+      }
     }
+    // 預設值
+    return {
+      defaultRate: 1.0,
+      showFurigana: true,
+      azureTTS: {
+        enabled: import.meta.env.VITE_AZURE_SPEECH_KEY ? true : false,
+        subscriptionKey: import.meta.env.VITE_AZURE_SPEECH_KEY || '',
+        region: import.meta.env.VITE_AZURE_SPEECH_REGION || 'eastasia',
+        defaultVoice: 'ja-JP-NanamiNeural'
+      }
+    };
   });
+
+  // 自動儲存設定到 localStorage
+  useEffect(() => {
+    localStorage.setItem('app-settings', JSON.stringify(settings));
+  }, [settings]);
 
   // 預設欄位定義
   const DEFAULT_FIELDS = {
