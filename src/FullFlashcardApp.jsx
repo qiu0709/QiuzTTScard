@@ -1721,6 +1721,18 @@ ${cleanText}
                   建立新 Gist
                 </button>
               </div>
+              {localSyncSettings.gistId && (
+                <p style={{ fontSize: isMobile ? '11px' : '12px', color: '#6b7280', margin: '5px 0 0 0' }}>
+                  🔗 <a
+                    href={`https://gist.github.com/${localSyncSettings.gistId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: '#4F46E5', textDecoration: 'underline' }}
+                  >
+                    查看您的 Gist 內容
+                  </a>
+                </p>
+              )}
             </div>
 
             <div style={{ marginBottom: '15px' }}>
@@ -1734,11 +1746,33 @@ ${cleanText}
               </label>
             </div>
 
-            {localSyncSettings.lastSyncTime && (
-              <p style={{ fontSize: '12px', color: '#6b7280' }}>
-                上次同步: {new Date(localSyncSettings.lastSyncTime).toLocaleString('zh-TW')}
-              </p>
-            )}
+            {/* 同步狀態顯示 */}
+            <div style={{
+              padding: '12px',
+              borderRadius: '8px',
+              backgroundColor: localSyncSettings.githubToken && localSyncSettings.gistId ? '#ECFDF5' : '#FEF3C7',
+              border: `1px solid ${localSyncSettings.githubToken && localSyncSettings.gistId ? '#10B981' : '#F59E0B'}`,
+              marginBottom: '15px'
+            }}>
+              <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '6px', color: '#1f2937' }}>
+                {localSyncSettings.githubToken && localSyncSettings.gistId ? '✅ 同步已設定' : '⚠️ 同步未設定'}
+              </div>
+              <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                {localSyncSettings.githubToken && localSyncSettings.gistId ? (
+                  <>
+                    <div>• 自動同步: {localSyncSettings.autoSync ? '✓ 已啟用' : '✗ 未啟用'}</div>
+                    {localSyncSettings.lastSyncTime && (
+                      <div>• 上次同步: {new Date(localSyncSettings.lastSyncTime).toLocaleString('zh-TW')}</div>
+                    )}
+                    {!localSyncSettings.lastSyncTime && (
+                      <div style={{ color: '#F59E0B' }}>• 尚未進行過同步，請點擊「上傳到雲端」進行首次同步</div>
+                    )}
+                  </>
+                ) : (
+                  <div>請填入 GitHub Token 和 Gist ID 以啟用同步功能</div>
+                )}
+              </div>
+            </div>
 
             <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '10px', marginTop: '15px' }}>
               <button
