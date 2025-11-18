@@ -7141,8 +7141,8 @@ ${cleanText}
                               
                               <div style={{ marginBottom: '15px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                                  <label style={{ fontSize: '14px', fontWeight: '500', color: '#374151' }}>顯示欄位</label>
-                                  <div style={{ fontSize: '12px', color: '#6b7280' }}>（可多選）</div>
+                                  <label style={{ fontSize: '14px', fontWeight: '500', color: '#374151' }}>選擇欄位</label>
+                                  <div style={{ fontSize: '12px', color: '#6b7280' }}>（點擊選擇）</div>
                                 </div>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                                   {Object.entries(getCurrentFields()).map(([fieldKey, fieldConfig]) => (
@@ -7179,6 +7179,79 @@ ${cleanText}
                                   ))}
                                 </div>
                               </div>
+
+                              {/* 欄位順序調整區 */}
+                              {template.fields.length > 0 && (
+                                <div style={{ marginBottom: '15px', padding: '12px', backgroundColor: '#fef3c7', borderRadius: '6px', border: '1px solid #f59e0b' }}>
+                                  <div style={{ fontSize: '14px', fontWeight: '500', color: '#92400e', marginBottom: '8px' }}>
+                                    📌 欄位顯示順序（拖曳調整）
+                                  </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    {template.fields.map((fieldKey, index) => (
+                                      <div
+                                        key={fieldKey}
+                                        draggable
+                                        onDragStart={(e) => {
+                                          e.dataTransfer.effectAllowed = 'move';
+                                          e.dataTransfer.setData('text/html', fieldKey);
+                                          e.currentTarget.style.opacity = '0.4';
+                                        }}
+                                        onDragEnd={(e) => {
+                                          e.currentTarget.style.opacity = '1';
+                                        }}
+                                        onDragOver={(e) => {
+                                          e.preventDefault();
+                                          e.dataTransfer.dropEffect = 'move';
+                                          e.currentTarget.style.borderTop = '2px solid #3b82f6';
+                                        }}
+                                        onDragLeave={(e) => {
+                                          e.currentTarget.style.borderTop = '1px solid #e5e7eb';
+                                        }}
+                                        onDrop={(e) => {
+                                          e.preventDefault();
+                                          e.currentTarget.style.borderTop = '1px solid #e5e7eb';
+                                          const draggedFieldKey = e.dataTransfer.getData('text/html');
+                                          if (draggedFieldKey === fieldKey) return;
+
+                                          const newFields = [...template.fields];
+                                          const draggedIndex = newFields.indexOf(draggedFieldKey);
+                                          const dropIndex = index;
+
+                                          // 移除拖曳的元素
+                                          newFields.splice(draggedIndex, 1);
+                                          // 插入到新位置
+                                          newFields.splice(dropIndex, 0, draggedFieldKey);
+
+                                          setDisplayTemplates(prev => ({
+                                            ...prev,
+                                            [templateId]: {
+                                              ...prev[templateId],
+                                              fields: newFields
+                                            }
+                                          }));
+                                        }}
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '10px',
+                                          padding: '8px 12px',
+                                          backgroundColor: 'white',
+                                          borderRadius: '4px',
+                                          border: '1px solid #e5e7eb',
+                                          cursor: 'grab',
+                                          transition: 'all 0.2s'
+                                        }}
+                                      >
+                                        <span style={{ fontSize: '16px' }}>☰</span>
+                                        <span style={{ fontSize: '13px', fontWeight: '500', color: '#374151', flex: 1 }}>
+                                          {getCurrentFields()[fieldKey]?.label || fieldKey}
+                                        </span>
+                                        <span style={{ fontSize: '11px', color: '#9ca3af' }}>#{index + 1}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
 
                               {/* 欄位樣式設定區 */}
                               {template.fields.length > 0 && (
