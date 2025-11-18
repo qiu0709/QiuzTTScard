@@ -4618,8 +4618,8 @@ ${cleanText}
                 {field?.type === 'kanji' ? (
                   <div style={{
                     fontSize: `${fieldStyle.fontSize}px`,
-                    lineHeight: '1.8',
-                    color: '#1f2937',
+                    lineHeight: fieldStyle.lineHeight || 1.8,
+                    color: fieldStyle.color || '#1f2937',
                     fontFamily: fieldStyle.fontFamily
                   }}>
                     <KanjiWithFurigana text={value} showFurigana={template.showFurigana} />
@@ -4627,8 +4627,8 @@ ${cleanText}
                 ) : (
                   <div style={{
                     fontSize: `${fieldStyle.fontSize}px`,
-                    lineHeight: '1.4',
-                    color: '#374151',
+                    lineHeight: fieldStyle.lineHeight || 1.4,
+                    color: fieldStyle.color || '#374151',
                     fontFamily: fieldStyle.fontFamily
                   }}>
                     {value}
@@ -4939,18 +4939,18 @@ ${cleanText}
                           <div style={{
                             fontSize: `${fieldStyle.fontSize}px`,
                             fontWeight: 'bold',
-                            color: '#374151',
+                            color: fieldStyle.color || '#374151',
                             fontFamily: fieldStyle.fontFamily,
-                            lineHeight: '1.8'
+                            lineHeight: fieldStyle.lineHeight || 1.8
                           }}>
                             <KanjiWithFurigana text={value} showFurigana={template?.showFurigana || false} />
                           </div>
                         ) : (
                           <p style={{
                             fontSize: `${fieldStyle.fontSize}px`,
-                            color: '#374151',
+                            color: fieldStyle.color || '#374151',
                             fontFamily: fieldStyle.fontFamily,
-                            lineHeight: '1.4',
+                            lineHeight: fieldStyle.lineHeight || 1.4,
                             margin: 0
                           }}>
                             {value}
@@ -6164,16 +6164,16 @@ ${cleanText}
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
-            marginBottom: '12px',
-            fontSize: '32px',
-            fontWeight: '700'
+            marginBottom: '6px',
+            fontSize: '12px',
+            fontWeight: '600'
           }}>
             🇯🇵 日本語学習カード
           </h1>
           <p style={{
             color: '#6B7280',
-            fontSize: '16px',
-            margin: '0 0 32px 0',
+            fontSize: '12px',
+            margin: '0 0 16px 0',
             fontWeight: '400'
           }}>
             智能語音閃卡，讓日語學習更有效率
@@ -7158,7 +7158,13 @@ ${cleanText}
                                   <div style={{ fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '10px' }}>欄位樣式設定</div>
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                     {template.fields.map(fieldKey => {
-                                      const fieldStyle = template.fieldStyles[fieldKey] || { fontSize: 24, fontFamily: 'sans-serif', textAlign: 'center' };
+                                      const fieldStyle = template.fieldStyles[fieldKey] || {
+                                        fontSize: 24,
+                                        fontFamily: 'sans-serif',
+                                        textAlign: 'center',
+                                        lineHeight: 1.5,
+                                        color: '#000000'
+                                      };
                                       const fieldConfig = getCurrentFields()[fieldKey];
                                       return (
                                         <div key={fieldKey} style={{ padding: '10px', backgroundColor: 'white', borderRadius: '4px', border: '1px solid #e5e7eb' }}>
@@ -7166,7 +7172,7 @@ ${cleanText}
                                             {fieldConfig?.label || fieldKey}
                                           </div>
 
-                                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '10px' }}>
                                             {/* 字型大小 */}
                                             <div>
                                               <label style={{ fontSize: '11px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>
@@ -7262,6 +7268,61 @@ ${cleanText}
                                                   </button>
                                                 ))}
                                               </div>
+                                            </div>
+
+                                            {/* 行間距 */}
+                                            <div>
+                                              <label style={{ fontSize: '11px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>
+                                                行距：{(fieldStyle.lineHeight || 1.5).toFixed(1)}
+                                              </label>
+                                              <input
+                                                type="range"
+                                                min="1.0"
+                                                max="3.0"
+                                                step="0.1"
+                                                value={fieldStyle.lineHeight || 1.5}
+                                                onChange={(e) => {
+                                                  setDisplayTemplates(prev => ({
+                                                    ...prev,
+                                                    [templateId]: {
+                                                      ...prev[templateId],
+                                                      fieldStyles: {
+                                                        ...prev[templateId].fieldStyles,
+                                                        [fieldKey]: {
+                                                          ...fieldStyle,
+                                                          lineHeight: parseFloat(e.target.value)
+                                                        }
+                                                      }
+                                                    }
+                                                  }));
+                                                }}
+                                                style={{ width: '100%' }}
+                                              />
+                                            </div>
+
+                                            {/* 顏色 */}
+                                            <div>
+                                              <label style={{ fontSize: '11px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>顏色</label>
+                                              <input
+                                                type="color"
+                                                value={fieldStyle.color || '#000000'}
+                                                onChange={(e) => {
+                                                  setDisplayTemplates(prev => ({
+                                                    ...prev,
+                                                    [templateId]: {
+                                                      ...prev[templateId],
+                                                      fieldStyles: {
+                                                        ...prev[templateId].fieldStyles,
+                                                        [fieldKey]: {
+                                                          ...fieldStyle,
+                                                          color: e.target.value
+                                                        }
+                                                      }
+                                                    }
+                                                  }));
+                                                }}
+                                                style={{ width: '100%', height: '28px', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer' }}
+                                              />
                                             </div>
                                           </div>
                                         </div>
