@@ -37,6 +37,12 @@
         -webkit-overflow-scrolling: touch;
       }
 
+      /* 同步狀態旋轉動畫 */
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+
       /* 手機版按鈕最小尺寸 */
       @media (max-width: 768px) {
         button {

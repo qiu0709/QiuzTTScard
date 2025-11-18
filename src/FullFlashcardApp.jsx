@@ -37,6 +37,8 @@ const FullFlashcardApp = () => {
     lastSyncTime: null
   }); // 雲端同步設定
 
+  const [syncStatus, setSyncStatus] = useState('idle'); // 同步狀態: idle, syncing, success, error
+
   // 檢測是否為手機裝置
   const [isMobile, setIsMobile] = useState(false);
 
@@ -1469,6 +1471,8 @@ ${cleanText}
       return;
     }
 
+    setSyncStatus('syncing'); // 開始同步
+
     try {
       const response = await fetch(`https://api.github.com/gists/${syncSettings.gistId}`, {
         method: 'PATCH',
@@ -1488,11 +1492,17 @@ ${cleanText}
       if (response.ok) {
         console.log('☁️ 資料已同步到雲端');
         setSyncSettings(prev => ({ ...prev, lastSyncTime: new Date().toISOString() }));
+        setSyncStatus('success'); // 同步成功
+        setTimeout(() => setSyncStatus('idle'), 3000); // 3秒後恢復idle
       } else {
         console.error('❌ 雲端同步失敗:', response.statusText);
+        setSyncStatus('error'); // 同步失敗
+        setTimeout(() => setSyncStatus('idle'), 5000); // 5秒後恢復idle
       }
     } catch (error) {
       console.error('❌ 雲端同步錯誤:', error);
+      setSyncStatus('error'); // 同步失敗
+      setTimeout(() => setSyncStatus('idle'), 5000); // 5秒後恢復idle
     }
   };
 
@@ -6150,12 +6160,86 @@ ${cleanText}
     };
 
     return (
-      <div style={{ 
+      <div style={{
         padding: '32px 24px',
         maxWidth: '1200px',
-        margin: '0 auto'
+        margin: '0 auto',
+        position: 'relative'
       }}>
-        <div style={{ 
+        {/* 右上角同步狀態指示器 */}
+        {syncSettings.githubToken && syncSettings.gistId && (
+          <div style={{
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            padding: '8px 16px',
+            borderRadius: '20px',
+            backgroundColor:
+              syncStatus === 'syncing' ? '#FEF3C7' :
+              syncStatus === 'success' ? '#D1FAE5' :
+              syncStatus === 'error' ? '#FEE2E2' :
+              '#F3F4F6',
+            border: `1px solid ${
+              syncStatus === 'syncing' ? '#F59E0B' :
+              syncStatus === 'success' ? '#10B981' :
+              syncStatus === 'error' ? '#EF4444' :
+              '#D1D5DB'
+            }`,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: '13px',
+            fontWeight: '500',
+            color:
+              syncStatus === 'syncing' ? '#92400E' :
+              syncStatus === 'success' ? '#065F46' :
+              syncStatus === 'error' ? '#991B1B' :
+              '#6B7280',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            zIndex: 1000,
+            cursor: 'pointer'
+          }}
+          onClick={() => setShowSyncDialog(true)}
+          title="點擊開啟同步設定"
+          >
+            {syncStatus === 'syncing' && (
+              <>
+                <span style={{
+                  display: 'inline-block',
+                  width: '12px',
+                  height: '12px',
+                  border: '2px solid #F59E0B',
+                  borderTopColor: 'transparent',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite'
+                }}></span>
+                同步中...
+              </>
+            )}
+            {syncStatus === 'success' && (
+              <>
+                ✓ 已同步
+              </>
+            )}
+            {syncStatus === 'error' && (
+              <>
+                ✗ 同步失敗
+              </>
+            )}
+            {syncStatus === 'idle' && syncSettings.autoSync && (
+              <>
+                ☁️ 自動同步
+              </>
+            )}
+            {syncStatus === 'idle' && !syncSettings.autoSync && (
+              <>
+                ☁️ 同步
+              </>
+            )}
+          </div>
+        )}
+
+        <div style={{
           textAlign: 'center',
           marginBottom: '40px'
         }}>
