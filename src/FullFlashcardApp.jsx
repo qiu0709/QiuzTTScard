@@ -251,6 +251,7 @@ const FullFlashcardApp = () => {
   const [showTemplateEditor, setShowTemplateEditor] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [currentTemplate, setCurrentTemplate] = useState('A');
+  const [selectedTemplateForEdit, setSelectedTemplateForEdit] = useState('A'); // 當前正在編輯的模板
 
   // 從 localStorage 讀取設定，如果沒有則使用預設值
   const [settings, setSettings] = useState(() => {
@@ -7050,9 +7051,9 @@ ${cleanText}
 
               {/* 分頁2: 頁面設定 */}
               {currentPlaySettingTab === 'pages' && (
-                <div style={{ 
-                  height: '100%', 
-                  display: 'flex', 
+                <div style={{
+                  height: '100%',
+                  display: 'flex',
                   flexDirection: 'column',
                   overflow: 'hidden'
                 }}>
@@ -7060,24 +7061,51 @@ ${cleanText}
                   <div style={{ flexShrink: 0 }}>
                     <h4 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '10px', color: '#3b82f6' }}>📱 頁面設定</h4>
                     <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '15px' }}>設定5種頁面模板（A、B、C、D、E），每種模板可自訂顯示的欄位</p>
+
+                    {/* 模板選擇器 */}
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '15px', flexWrap: 'wrap' }}>
+                      {['A', 'B', 'C', 'D', 'E'].map(templateId => (
+                        <button
+                          key={templateId}
+                          onClick={() => setSelectedTemplateForEdit(templateId)}
+                          style={{
+                            padding: '8px 16px',
+                            fontSize: '14px',
+                            fontWeight: selectedTemplateForEdit === templateId ? 'bold' : 'normal',
+                            borderRadius: '6px',
+                            border: selectedTemplateForEdit === templateId ? '2px solid #3b82f6' : '1px solid #d1d5db',
+                            backgroundColor: selectedTemplateForEdit === templateId ? '#dbeafe' : 'white',
+                            color: selectedTemplateForEdit === templateId ? '#1e40af' : '#374151',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          模板{templateId} {currentTemplate === templateId && '✓'}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   
                   {/* 可滾動內容區域 */}
-                  <div style={{ 
-                    flex: 1, 
-                    overflowY: 'auto', 
-                    border: '1px solid #e5e7eb', 
-                    borderRadius: '6px', 
+                  <div style={{
+                    flex: 1,
+                    overflowY: 'auto',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '6px',
                     padding: '20px',
                     backgroundColor: '#f8f9fa'
                   }}>
-                    {/* 模板設定界面 */}
+                    {/* 模板設定界面 - 單一模板並排顯示 */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', height: '100%' }}>
                       {/* 左側：模板設定 */}
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <h4 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '15px', color: '#059669' }}>📋 模板設定</h4>
                         <div style={{ flex: 1, overflowY: 'auto' }}>
-                          {Object.entries(displayTemplates).map(([templateId, template]) => (
+                          {/* 只顯示選中的模板 */}
+                          {(() => {
+                            const templateId = selectedTemplateForEdit;
+                            const template = displayTemplates[templateId];
+                            return (
                             <div key={templateId} style={{ 
                               marginBottom: '20px', 
                               padding: '15px', 
@@ -7408,15 +7436,20 @@ ${cleanText}
                                 </label>
                               </div>
                             </div>
-                          ))}
+                            );
+                          })()}
                         </div>
                       </div>
-                      
+
                       {/* 右側：預覽區域 */}
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <h4 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '15px', color: '#059669' }}>👀 模板預覽</h4>
                         <div style={{ flex: 1, overflowY: 'auto' }}>
-                          {Object.entries(displayTemplates).map(([templateId, template]) => (
+                          {/* 只顯示選中的模板 */}
+                          {(() => {
+                            const templateId = selectedTemplateForEdit;
+                            const template = displayTemplates[templateId];
+                            return (
                             <div key={templateId} style={{
                               marginBottom: '15px',
                               padding: '15px',
@@ -7524,7 +7557,8 @@ ${cleanText}
                                 </div>
                               )}
                             </div>
-                          ))}
+                            );
+                          })()}
                         </div>
                       </div>
                     </div>
