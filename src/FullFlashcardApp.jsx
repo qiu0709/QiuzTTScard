@@ -30,11 +30,23 @@ const FullFlashcardApp = () => {
   const [showGroupDialog, setShowGroupDialog] = useState(false); // 顯示分組對話框
   const [selectedSubFolders, setSelectedSubFolders] = useState([]); // 選中要播放的子資料夾
   const [showSyncDialog, setShowSyncDialog] = useState(false); // 顯示同步對話框
-  const [syncSettings, setSyncSettings] = useState({
-    githubToken: '',
-    gistId: '',
-    autoSync: false,
-    lastSyncTime: null
+  // 從 localStorage 讀取同步設定，如果沒有則使用預設值
+  const [syncSettings, setSyncSettings] = useState(() => {
+    const savedSyncSettings = localStorage.getItem('sync-settings');
+    if (savedSyncSettings) {
+      try {
+        return JSON.parse(savedSyncSettings);
+      } catch (e) {
+        console.error('讀取同步設定失敗，使用預設值', e);
+      }
+    }
+    // 預設值
+    return {
+      githubToken: '',
+      gistId: '',
+      autoSync: false,
+      lastSyncTime: null
+    };
   }); // 雲端同步設定
 
   const [syncStatus, setSyncStatus] = useState('idle'); // 同步狀態: idle, syncing, success, error
@@ -293,6 +305,11 @@ const FullFlashcardApp = () => {
   useEffect(() => {
     localStorage.setItem('app-settings', JSON.stringify(settings));
   }, [settings]);
+
+  // 自動儲存同步設定到 localStorage
+  useEffect(() => {
+    localStorage.setItem('sync-settings', JSON.stringify(syncSettings));
+  }, [syncSettings]);
 
   // 預設欄位定義
   const DEFAULT_FIELDS = {
