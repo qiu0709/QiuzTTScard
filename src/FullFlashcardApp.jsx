@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import DesignEditor from './components/DesignEditor.jsx';
 import TableViewCard from './components/TableViewCard.jsx';
 import ClickableWrapper from './components/ClickableWrapper.jsx';
+import MediaCard from './components/MediaCard.jsx';
+import MediaCardDisplay from './components/MediaCardDisplay.jsx';
 import { parseApkgFile, convertToAppFormat } from './utils/apkgImporter.js';
 
 const FullFlashcardApp = () => {
@@ -30,6 +32,8 @@ const FullFlashcardApp = () => {
   const [showGroupDialog, setShowGroupDialog] = useState(false); // 顯示分組對話框
   const [selectedSubFolders, setSelectedSubFolders] = useState([]); // 選中要播放的子資料夾
   const [showSyncDialog, setShowSyncDialog] = useState(false); // 顯示同步對話框
+  const [showMediaCardEditor, setShowMediaCardEditor] = useState(false); // 顯示媒體卡片編輯器
+  const [editingMediaCard, setEditingMediaCard] = useState(null); // 正在編輯的媒體卡片
   // 從 localStorage 讀取同步設定，如果沒有則使用預設值
   const [syncSettings, setSyncSettings] = useState(() => {
     const savedSyncSettings = localStorage.getItem('sync-settings');
@@ -1611,6 +1615,39 @@ ${cleanText}
       }
     };
     reader.readAsText(file);
+  };
+
+  // 媒體卡片處理函數
+  const handleMediaCardUpdate = (mediaCard) => {
+    if (!currentFolder) {
+      alert('請先選擇一個資料夾');
+      return;
+    }
+
+    const updatedFolders = folders.map(folder => {
+      if (folder.id === currentFolder.id) {
+        const existingCardIndex = folder.cards.findIndex(c => c.id === mediaCard.id);
+
+        if (existingCardIndex >= 0) {
+          // 更新現有卡片
+          const updatedCards = [...folder.cards];
+          updatedCards[existingCardIndex] = mediaCard;
+          return { ...folder, cards: updatedCards };
+        } else {
+          // 新增卡片
+          return { ...folder, cards: [...folder.cards, mediaCard] };
+        }
+      }
+      return folder;
+    });
+
+    setFolders(updatedFolders);
+    setCurrentFolder(updatedFolders.find(f => f.id === currentFolder.id));
+  };
+
+  const openMediaCardEditor = (card = null) => {
+    setEditingMediaCard(card);
+    setShowMediaCardEditor(true);
   };
 
   // 雲端同步對話框
@@ -4947,7 +4984,11 @@ ${cleanText}
           </div>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {(() => {
+            {/* 如果是媒體卡片，使用 MediaCardDisplay 顯示 */}
+            {card.type === 'media' ? (
+              <MediaCardDisplay card={card} isMobile={isMobile} />
+            ) : (
+            (() => {
               // 使用當前選擇的模板
               const template = displayTemplates[currentTemplate];
               const fieldsToShow = template?.fields || [];
@@ -5023,7 +5064,8 @@ ${cleanText}
                   })}
                 </>
               );
-            })()}
+            })()
+            )}
           </div>
         </div>
 
@@ -5714,6 +5756,20 @@ ${cleanText}
               }}
             >
               ☰
+            </button>
+            <button
+              onClick={() => openMediaCardEditor()}
+              title="新增照片錄音卡片"
+              style={{
+                ...styles.button,
+                backgroundColor: '#10b981',
+                minWidth: isMobile ? '44px' : '50px',
+                padding: isMobile ? '12px' : '10px 16px',
+                fontSize: isMobile ? '22px' : '20px',
+                fontWeight: '400'
+              }}
+            >
+              📸
             </button>
             <button
               onClick={() => {
@@ -8344,6 +8400,18 @@ ${cleanText}
 
       {/* 雲端同步對話框 */}
       {showSyncDialog && <SyncDialog />}
+
+      {/* 媒體卡片編輯器 */}
+      {showMediaCardEditor && (
+        <MediaCard
+          card={editingMediaCard}
+          onUpdate={handleMediaCardUpdate}
+          onClose={() => {
+            setShowMediaCardEditor(false);
+            setEditingMediaCard(null);
+          }}
+        />
+      )}
     </div>
   );
 };
