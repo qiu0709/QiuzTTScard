@@ -370,7 +370,7 @@ const MediaCard = ({ card, onUpdate, onClose }) => {
                 <input
                   type="range"
                   min="0.5"
-                  max="2.0"
+                  max="4.0"
                   step="0.1"
                   value={playbackRate}
                   onChange={(e) => setPlaybackRate(parseFloat(e.target.value))}
@@ -380,6 +380,7 @@ const MediaCard = ({ card, onUpdate, onClose }) => {
                   <span>0.5x</span>
                   <span>1.0x</span>
                   <span>2.0x</span>
+                  <span>4.0x</span>
                 </div>
               </div>
 

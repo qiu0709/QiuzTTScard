@@ -3531,14 +3531,23 @@ ${cleanText}
         console.log('正在解析 .apkg 檔案...');
 
         // 解析 .apkg 檔案
-        const ankiCards = await parseApkgFile(file);
-        console.log('parseApkgFile 回傳結果:', ankiCards);
+        const { cards: ankiCards, mediaFiles } = await parseApkgFile(file);
+        console.log('parseApkgFile 回傳結果:', { ankiCards, mediaFiles });
         console.log(`成功提取 ${ankiCards.length} 張卡片`);
+        console.log(`成功提取 ${Object.keys(mediaFiles).length} 個音檔`);
 
         if (!ankiCards || ankiCards.length === 0) {
           console.warn('沒有提取到卡片');
           alert('檔案中沒有找到卡片,請檢查檔案是否有效。');
           return;
+        }
+
+        // 統計有音檔的卡片
+        const cardsWithAudio = ankiCards.filter(card =>
+          card.audioFields && Object.keys(card.audioFields).length > 0
+        );
+        if (cardsWithAudio.length > 0) {
+          console.log(`其中 ${cardsWithAudio.length} 張卡片包含音檔`);
         }
 
         // 分析欄位並準備預覽數據

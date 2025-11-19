@@ -4,7 +4,7 @@ import initSqlJs from 'sql.js';
 /**
  * 解析 Anki .apkg 檔案
  * @param {File} file - .apkg 檔案
- * @returns {Promise<Object>} 解析後的資料
+ * @returns {Promise<Object>} 解析後的資料，包含卡片和音檔
  */
 export async function parseApkgFile(file) {
   try {
@@ -25,20 +25,28 @@ export async function parseApkgFile(file) {
     console.log('找到資料庫檔案:', collectionFile.name);
     const dbData = await collectionFile.async('arraybuffer');
 
-    // 3. 初始化 SQL.js 並載入資料庫
+    // 3. 提取媒體檔案映射表
+    const mediaMap = await extractMediaMap(zip);
+    console.log('媒體檔案映射表:', mediaMap);
+
+    // 4. 提取音檔檔案
+    const mediaFiles = await extractMediaFiles(zip, mediaMap);
+    console.log(`提取了 ${Object.keys(mediaFiles).length} 個媒體檔案`);
+
+    // 5. 初始化 SQL.js 並載入資料庫
     const SQL = await initSqlJs({
       locateFile: file => `https://sql.js.org/dist/${file}`
     });
 
     const db = new SQL.Database(new Uint8Array(dbData));
 
-    // 4. 提取卡片資料
-    const cards = extractCards(db);
+    // 6. 提取卡片資料
+    const cards = extractCards(db, mediaFiles);
 
-    // 5. 清理資源
+    // 7. 清理資源
     db.close();
 
-    return cards;
+    return { cards, mediaFiles };
   } catch (error) {
     console.error('解析 .apkg 檔案失敗:', error);
     throw new Error('解析 .apkg 檔案失敗: ' + error.message);
@@ -46,9 +54,90 @@ export async function parseApkgFile(file) {
 }
 
 /**
+ * 提取媒體檔案映射表
+ */
+async function extractMediaMap(zip) {
+  try {
+    const mediaFile = zip.file('media');
+    if (!mediaFile) {
+      console.log('沒有找到 media 映射檔案');
+      return {};
+    }
+
+    const mediaContent = await mediaFile.async('text');
+    const mediaMap = JSON.parse(mediaContent);
+    console.log('媒體映射表:', mediaMap);
+    return mediaMap;
+  } catch (error) {
+    console.warn('無法讀取媒體映射表:', error);
+    return {};
+  }
+}
+
+/**
+ * 提取媒體檔案並轉換為 base64
+ */
+async function extractMediaFiles(zip, mediaMap) {
+  const mediaFiles = {};
+
+  for (const [index, fileName] of Object.entries(mediaMap)) {
+    try {
+      // 媒體檔案名稱就是數字索引
+      const mediaFile = zip.file(index);
+      if (!mediaFile) {
+        console.warn(`找不到媒體檔案: ${index} (${fileName})`);
+        continue;
+      }
+
+      // 判斷檔案類型
+      const extension = fileName.split('.').pop().toLowerCase();
+      const isAudio = ['mp3', 'wav', 'ogg', 'm4a', 'webm', 'aac', 'flac'].includes(extension);
+
+      if (!isAudio) {
+        console.log(`跳過非音檔: ${fileName}`);
+        continue;
+      }
+
+      // 讀取檔案並轉換為 base64
+      const fileData = await mediaFile.async('base64');
+      const mimeType = getMimeType(extension);
+      const dataUrl = `data:${mimeType};base64,${fileData}`;
+
+      mediaFiles[fileName] = {
+        fileName,
+        dataUrl,
+        mimeType
+      };
+
+      console.log(`成功提取音檔: ${fileName} (${(fileData.length / 1024).toFixed(2)} KB)`);
+    } catch (error) {
+      console.error(`提取媒體檔案 ${fileName} 失敗:`, error);
+    }
+  }
+
+  return mediaFiles;
+}
+
+/**
+ * 根據副檔名獲取 MIME 類型
+ */
+function getMimeType(extension) {
+  const mimeTypes = {
+    'mp3': 'audio/mpeg',
+    'wav': 'audio/wav',
+    'ogg': 'audio/ogg',
+    'm4a': 'audio/mp4',
+    'webm': 'audio/webm',
+    'aac': 'audio/aac',
+    'flac': 'audio/flac'
+  };
+  return mimeTypes[extension] || 'audio/mpeg';
+}
+
+/**
  * 從 Anki 資料庫提取卡片
  */
-function extractCards(db) {
+function extractCards(db, mediaFiles = {}) {
   console.log('開始提取卡片...');
 
   try {
@@ -115,13 +204,18 @@ function extractCards(db) {
 
       const card = {
         id: `anki-${id}`,
-        fields: {}
+        fields: {},
+        audioFields: {} // 存儲音檔數據
       };
 
       // 為每個欄位建立一個鍵值對,使用真實欄位名稱
       fieldValues.forEach((value, index) => {
         const fieldName = fieldNames[index] || `欄位${index + 1}`;
-        card.fields[fieldName] = cleanHtml(value);
+        const { text, audioFile } = extractAudioFromHtml(value, mediaFiles);
+        card.fields[fieldName] = text;
+        if (audioFile) {
+          card.audioFields[fieldName] = audioFile;
+        }
       });
 
       cards.push(card);
@@ -136,16 +230,42 @@ function extractCards(db) {
 }
 
 /**
+ * 從 HTML 中提取音檔引用和文字
+ */
+function extractAudioFromHtml(html, mediaFiles) {
+  if (!html) return { text: '', audioFile: null };
+
+  let text = html;
+  let audioFile = null;
+
+  // 處理 Anki 音檔標記 [sound:filename.mp3]
+  const soundMatch = text.match(/\[sound:([^\]]+)\]/);
+  if (soundMatch) {
+    const fileName = soundMatch[1];
+    // 從 mediaFiles 中查找對應的音檔
+    if (mediaFiles[fileName]) {
+      audioFile = mediaFiles[fileName];
+      console.log(`找到音檔: ${fileName}`);
+    } else {
+      console.warn(`音檔未找到: ${fileName}`);
+    }
+    // 移除音檔標記
+    text = text.replace(/\[sound:([^\]]+)\]/g, '');
+  }
+
+  // 清理 HTML
+  text = cleanHtml(text);
+
+  return { text, audioFile };
+}
+
+/**
  * 清理 HTML 標籤,保留重要內容
  */
 function cleanHtml(html) {
   if (!html) return '';
 
   let text = html;
-
-  // 處理 Anki 特殊標記
-  // [sound:filename.mp3] -> 🔊 filename.mp3
-  text = text.replace(/\[sound:([^\]]+)\]/g, '🔊 $1');
 
   // 保留換行
   text = text.replace(/<br\s*\/?>/gi, '\n');
@@ -257,13 +377,19 @@ export function convertToAppFormat(ankiCards, folderName = '匯入的 Anki 卡�
   const cards = ankiCards.map((ankiCard, index) => {
     const convertedCard = {
       id: ankiCard.id || `card-${Date.now()}-${index}`,
-      fields: {}
+      fields: {},
+      audioFields: {} // 保留音檔數據
     };
 
     // 將 Anki 卡片的欄位映射到新格式
     Object.entries(fields).forEach(([fieldKey, fieldDef]) => {
       const originalFieldName = fieldDef.label;
       convertedCard.fields[fieldKey] = ankiCard.fields[originalFieldName] || '';
+
+      // 如果該欄位有音檔，也保存音檔數據
+      if (ankiCard.audioFields && ankiCard.audioFields[originalFieldName]) {
+        convertedCard.audioFields[fieldKey] = ankiCard.audioFields[originalFieldName];
+      }
     });
 
     return convertedCard;
@@ -271,6 +397,10 @@ export function convertToAppFormat(ankiCards, folderName = '匯入的 Anki 卡�
 
   console.log(`成功轉換 ${cards.length} 張卡片`);
   console.log('第一張卡片範例:', cards[0]);
+
+  // 統計有音檔的卡片數量
+  const cardsWithAudio = cards.filter(card => Object.keys(card.audioFields).length > 0);
+  console.log(`其中 ${cardsWithAudio.length} 張卡片包含音檔`);
 
   return {
     name: folderName,
