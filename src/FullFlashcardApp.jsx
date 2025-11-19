@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import DesignEditor from './components/DesignEditor.jsx';
 import TableViewCard from './components/TableViewCard.jsx';
 import ClickableWrapper from './components/ClickableWrapper.jsx';
@@ -4750,6 +4750,182 @@ ${cleanText}
     );
   };
 
+  // 音檔播放控制組件
+  const AudioPlaybackControl = ({ audioData, fieldLabel, isMobile }) => {
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [playbackRate, setPlaybackRate] = useState(1.0);
+    const [currentTime, setCurrentTime] = useState(0);
+    const [duration, setDuration] = useState(0);
+    const audioRef = useRef(null);
+
+    // 播放/暫停
+    const togglePlayback = () => {
+      if (!audioRef.current) return;
+
+      if (isPlaying) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      } else {
+        audioRef.current.play();
+        setIsPlaying(true);
+      }
+    };
+
+    // 調整播放速度
+    useEffect(() => {
+      if (audioRef.current) {
+        audioRef.current.playbackRate = playbackRate;
+      }
+    }, [playbackRate]);
+
+    // 更新播放進度
+    useEffect(() => {
+      const audio = audioRef.current;
+      if (!audio) return;
+
+      const updateTime = () => setCurrentTime(audio.currentTime);
+      const updateDuration = () => setDuration(audio.duration);
+      const handleEnded = () => setIsPlaying(false);
+
+      audio.addEventListener('timeupdate', updateTime);
+      audio.addEventListener('loadedmetadata', updateDuration);
+      audio.addEventListener('ended', handleEnded);
+
+      return () => {
+        audio.removeEventListener('timeupdate', updateTime);
+        audio.removeEventListener('loadedmetadata', updateDuration);
+        audio.removeEventListener('ended', handleEnded);
+      };
+    }, [audioData?.dataUrl]);
+
+    // 格式化時間顯示
+    const formatTime = (seconds) => {
+      if (isNaN(seconds)) return '0:00';
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+    return (
+      <div style={{
+        marginTop: '16px',
+        padding: isMobile ? '12px' : '16px',
+        backgroundColor: '#F3F4F6',
+        borderRadius: '12px',
+        border: '2px solid #E5E7EB'
+      }}>
+        {/* 音檔來源標籤 */}
+        <div style={{
+          fontSize: '11px',
+          color: '#6b7280',
+          marginBottom: '8px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px'
+        }}>
+          <span>🎵</span>
+          <span>{fieldLabel} - 原始音檔</span>
+        </div>
+
+        {/* 播放按鈕 */}
+        <button
+          onClick={togglePlayback}
+          style={{
+            width: '100%',
+            padding: isMobile ? '12px' : '14px',
+            fontSize: isMobile ? '14px' : '16px',
+            fontWeight: '600',
+            borderRadius: '8px',
+            border: 'none',
+            cursor: 'pointer',
+            backgroundColor: '#4F46E5',
+            color: 'white',
+            marginBottom: '12px',
+            transition: 'all 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#4338CA'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#4F46E5'}
+        >
+          <span style={{ fontSize: '20px' }}>{isPlaying ? '⏸' : '▶'}</span>
+          <span>{isPlaying ? '暫停' : '播放'}</span>
+        </button>
+
+        {/* 播放進度條 */}
+        <div style={{
+          width: '100%',
+          height: '6px',
+          backgroundColor: '#E5E7EB',
+          borderRadius: '3px',
+          marginBottom: '8px',
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          <div style={{
+            height: '100%',
+            backgroundColor: '#4F46E5',
+            borderRadius: '3px',
+            width: `${progress}%`,
+            transition: 'width 0.1s'
+          }} />
+        </div>
+
+        {/* 時間顯示 */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          fontSize: '11px',
+          color: '#6b7280',
+          marginBottom: '12px'
+        }}>
+          <span>{formatTime(currentTime)}</span>
+          <span>{formatTime(duration)}</span>
+        </div>
+
+        {/* 播放速度控制 */}
+        <div>
+          <label style={{
+            fontSize: '12px',
+            fontWeight: '600',
+            color: '#374151',
+            marginBottom: '6px',
+            display: 'block'
+          }}>
+            播放速度: {playbackRate.toFixed(1)}x
+          </label>
+          <input
+            type="range"
+            min="0.5"
+            max="4.0"
+            step="0.1"
+            value={playbackRate}
+            onChange={(e) => setPlaybackRate(parseFloat(e.target.value))}
+            style={{ width: '100%', marginBottom: '4px' }}
+          />
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            fontSize: '10px',
+            color: '#9ca3af'
+          }}>
+            <span>0.5x</span>
+            <span>1.0x</span>
+            <span>2.0x</span>
+            <span>4.0x</span>
+          </div>
+        </div>
+
+        {/* 隱藏的音檔元素 */}
+        <audio ref={audioRef} src={audioData?.dataUrl} style={{ display: 'none' }} />
+      </div>
+    );
+  };
+
   // 學習模式視圖
   const StudyView = () => {
     const cards = currentFolder?.cards || [];
@@ -5042,6 +5218,7 @@ ${cleanText}
                     const field = currentFields[fieldKey];
                     const value = card.fields[fieldKey];
                     const fieldStyle = template?.fieldStyles?.[fieldKey] || { fontSize: 24, fontFamily: 'sans-serif', textAlign: 'center' };
+                    const audioData = card.audioFields?.[fieldKey]; // 檢查是否有音檔
 
                     if (!value || !field) return null;
 
@@ -5067,6 +5244,15 @@ ${cleanText}
                           }}>
                             {value}
                           </p>
+                        )}
+
+                        {/* 如果有音檔，顯示播放控制 */}
+                        {audioData && (
+                          <AudioPlaybackControl
+                            audioData={audioData}
+                            fieldLabel={field?.label || fieldKey}
+                            isMobile={isMobile}
+                          />
                         )}
                       </div>
                     );
