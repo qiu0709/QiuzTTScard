@@ -5,6 +5,7 @@ import ClickableWrapper from './components/ClickableWrapper.jsx';
 import MediaCard from './components/MediaCard.jsx';
 import MediaCardDisplay from './components/MediaCardDisplay.jsx';
 import { parseApkgFile, convertToAppFormat } from './utils/apkgImporter.js';
+import { parseTxtFile } from './utils/txtImporter.js';
 
 const FullFlashcardApp = () => {
   const [folders, setFolders] = useState([]);
@@ -743,9 +744,10 @@ const FullFlashcardApp = () => {
   // 漢字注音顯示組件
   const KanjiWithFurigana = ({ text, showFurigana = true }) => {
     if (!text) return null;
-    
+
     const parts = [];
-    const regex = /([一-龯々〆〤ヶ]+)\[([あ-んゃゅょぁぃぅぇぉっー]+)\]/g;
+    // 支援兩種格式：漢字[ふりがな] 和 漢字（ふりがな）
+    const regex = /([一-龯々〆〤ヶ]+)[\[（]([あ-んゃゅょぁぃぅぇぉっー]+)[\]）]/g;
     let lastIndex = 0;
     let match;
 
@@ -792,7 +794,8 @@ const FullFlashcardApp = () => {
 
   // Azure TTS 語音合成功能
   const speakWithAzure = useCallback(async (text, voice, azureSettings, voiceStyle = null) => {
-    const cleanText = text.replace(/\[([あ-んゃゅょぁぃぅぇぉっー]+)\]/g, '');
+    // 清除注音標記：支援 [ふりがな] 和 （ふりがな） 兩種格式
+    const cleanText = text.replace(/[\[（]([あ-んゃゅょぁぃぅぇぉっー]+)[\]）]/g, '');
     const cache = audioCache();
     
     // 使用預設風格如果沒有提供
@@ -3519,20 +3522,34 @@ ${cleanText}
       const file = event.target.files?.[0];
       if (!file) return;
 
-      console.log('開始匯入 .apkg 檔案:', file.name);
+      console.log('開始匯入檔案:', file.name);
 
-      if (!file.name.endsWith('.apkg')) {
-        alert('請選擇 .apkg 檔案');
+      // 檢查檔案類型
+      const isApkg = file.name.endsWith('.apkg');
+      const isTxt = file.name.endsWith('.txt');
+
+      if (!isApkg && !isTxt) {
+        alert('請選擇 .apkg 或 .txt 檔案');
         return;
       }
 
       try {
         // 顯示載入中提示
-        console.log('正在解析 .apkg 檔案...');
+        console.log(`正在解析 ${isApkg ? '.apkg' : '.txt'} 檔案...`);
 
-        // 解析 .apkg 檔案
-        const { cards: ankiCards, mediaFiles } = await parseApkgFile(file);
-        console.log('parseApkgFile 回傳結果:', { ankiCards, mediaFiles });
+        // 根據檔案類型選擇解析器
+        let ankiCards, mediaFiles;
+        if (isApkg) {
+          const result = await parseApkgFile(file);
+          ankiCards = result.cards;
+          mediaFiles = result.mediaFiles;
+        } else {
+          const result = await parseTxtFile(file);
+          ankiCards = result.cards;
+          mediaFiles = result.mediaFiles;
+        }
+
+        console.log('解析完成，回傳結果:', { ankiCards, mediaFiles });
         console.log(`成功提取 ${ankiCards.length} 張卡片`);
         console.log(`成功提取 ${Object.keys(mediaFiles).length} 個音檔`);
 
@@ -3715,14 +3732,14 @@ ${cleanText}
             </div>
 
             <div style={{ padding: '15px', border: '1px solid #d1d5db', borderRadius: '6px' }}>
-              <h4 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '10px' }}>從 Anki .apkg 檔案匯入</h4>
+              <h4 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '10px' }}>從 Anki 檔案匯入</h4>
               <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '10px' }}>
-                支援匯入 Anki 卡包檔案 (.apkg),自動提取卡片資料
+                支援匯入 Anki 卡包 (.apkg) 或純文字 (.txt) 檔案
               </p>
               <input
                 id="apkgInput"
                 type="file"
-                accept=".apkg"
+                accept=".apkg,.txt"
                 style={{ display: 'none' }}
                 onChange={handleApkgImport}
               />
@@ -3730,7 +3747,7 @@ ${cleanText}
                 onClick={() => document.getElementById('apkgInput').click()}
                 style={{ ...styles.button }}
               >
-                📦 選擇 .apkg 檔案
+                📦 選擇 .apkg 或 .txt 檔案
               </button>
             </div>
 

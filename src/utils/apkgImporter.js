@@ -182,6 +182,19 @@ function extractCards(db, mediaFiles = {}) {
     const query = db.exec('SELECT id, mid, flds FROM notes');
 
     console.log('查詢結果:', query);
+    console.log('查詢到的記錄數量:', query.length > 0 ? query[0].values.length : 0);
+
+    // 額外除錯：檢查資料庫中的表格
+    try {
+      const tables = db.exec("SELECT name FROM sqlite_master WHERE type='table'");
+      console.log('資料庫中的表格:', tables);
+
+      // 檢查 notes 表的總數
+      const countQuery = db.exec('SELECT COUNT(*) as count FROM notes');
+      console.log('notes 表中的總記錄數:', countQuery);
+    } catch (e) {
+      console.warn('無法取得資料庫資訊:', e);
+    }
 
     if (!query.length || !query[0].values.length) {
       console.warn('資料庫中沒有找到卡片');
