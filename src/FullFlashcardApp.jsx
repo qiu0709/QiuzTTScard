@@ -14,6 +14,11 @@ const FullFlashcardApp = () => {
   const [currentView, setCurrentView] = useState('home');
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const playbackControlRef = useRef({ shouldContinue: true }); // 控制腳本播放的 ref
+  const audioContextRef = useRef(null); // 全局 AudioContext
+  const currentAudioSourceRef = useRef(null); // 當前播放的音頻源
+  const globalAutoPlayLockRef = useRef(false); // 全局播放鎖，防止重複執行
+  const globalSessionIdRef = useRef(0); // 全局 session ID
   const [showSpreadsheet, setShowSpreadsheet] = useState(false);
   const [showFieldEditor, setShowFieldEditor] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
@@ -26,6 +31,8 @@ const FullFlashcardApp = () => {
   // showGlobalTemplateEditor 已移除，模板編輯整合至播放設定頁面
   const [showAutoPlayEditor, setShowAutoPlayEditor] = useState(false);
   const [currentPlaySettingTab, setCurrentPlaySettingTab] = useState('script'); // 'script' | 'pages'
+  const [editingCard, setEditingCard] = useState(null); // 正在編輯腳本的卡片
+  const [editingScriptIndex, setEditingScriptIndex] = useState(0); // 正在編輯的腳本索引
   const [designMode, setDesignMode] = useState(false); // 設計模式開關
   const [selectedElement, setSelectedElement] = useState(null); // 當前選中的元素
   const [customStyles, setCustomStyles] = useState({}); // 自定義樣式
@@ -73,13 +80,19 @@ const FullFlashcardApp = () => {
   // 語音設定狀態 - 為每個欄位設定Azure語音、速度、風格
   const [fieldVoiceSettings, setFieldVoiceSettings] = useState({
     kanji: {
-      voice: 'zh-TW-HsiaoChenNeural',
+      voice: 'ja-JP-NanamiNeural', // 日文漢字應該用日文語音
+      rate: 1.0,
+      pitch: 1.0,
+      style: 'neutral'
+    },
+    hiragana: {
+      voice: 'ja-JP-NanamiNeural', // 平假名也用日文
       rate: 1.0,
       pitch: 1.0,
       style: 'neutral'
     },
     meaning: {
-      voice: 'zh-TW-YunJheNeural', 
+      voice: 'zh-TW-YunJheNeural',
       rate: 0.9,
       pitch: 1.0,
       style: 'cheerful'
@@ -87,7 +100,7 @@ const FullFlashcardApp = () => {
     pos: {
       voice: 'zh-TW-HsiaoChenNeural',
       rate: 1.1,
-      pitch: 1.0, 
+      pitch: 1.0,
       style: 'gentle'
     },
     example: {
@@ -149,7 +162,7 @@ const FullFlashcardApp = () => {
   const [currentAutoPlayCard, setCurrentAutoPlayCard] = useState(0);
   const [currentAutoPlayStep, setCurrentAutoPlayStep] = useState(0);
   
-  // 自動播放腳本設定 - 混合模板顯示和語音播放
+  // 自動播放腳本設定 - 混合模板顯示和語音播放（已棄用，保留用於相容性）
   const [autoPlayScript, setAutoPlayScript] = useState([
     {
       id: '1',
@@ -157,11 +170,13 @@ const FullFlashcardApp = () => {
       templateId: 'A'
     },
     {
-      id: '2', 
+      id: '2',
       type: 'speak',
       field: 'kanji',
       repeat: 3,
       rate: 0.8,
+      pauseMode: 'sentence',
+      sentenceMultiplier: 1.0,
       pauseAfter: 1000
     },
     {
@@ -170,6 +185,8 @@ const FullFlashcardApp = () => {
       field: 'example',
       repeat: 1,
       rate: 1.0,
+      pauseMode: 'sentence',
+      sentenceMultiplier: 1.0,
       pauseAfter: 1500
     },
     {
@@ -183,16 +200,37 @@ const FullFlashcardApp = () => {
       field: 'meaning',
       repeat: 1,
       rate: 1.0,
+      pauseMode: 'sentence',
+      sentenceMultiplier: 1.0,
       pauseAfter: 1000
     }
   ]);
-  
-  const [currentAutoPlayTemplate, setCurrentAutoPlayTemplate] = useState('A');
+
+  // 使用 ref 而不是 state，避免切換模板時觸發父組件重新渲染
+  const currentAutoPlayTemplateRef = useRef('A');
+  const updateTemplateCallbackRef = useRef(null); // 用於通知 AutoPlayAllView 更新模板的回調
   const [editingVoiceStyle, setEditingVoiceStyle] = useState(null);
   
   // 拖曳狀態
   const [draggedStepIndex, setDraggedStepIndex] = useState(null);
-  
+
+  // 輔助函數：更新當前編輯卡片的腳本
+  const updateCurrentScript = useCallback((updater) => {
+    if (!editingCard || editingScriptIndex === undefined) return;
+
+    setEditingCard(prevCard => {
+      if (!prevCard) return prevCard;
+      const currentScript = prevCard.pages[editingScriptIndex]?.script || [];
+      const newScript = typeof updater === 'function' ? updater(currentScript) : updater;
+      const updatedPages = [...prevCard.pages];
+      updatedPages[editingScriptIndex] = {
+        ...updatedPages[editingScriptIndex],
+        script: newScript
+      };
+      return { ...prevCard, pages: updatedPages };
+    });
+  }, [editingCard, editingScriptIndex]);
+
   // 自動播放腳本拖曳處理函數
   const handleAutoPlayStepDragStart = (e, index) => {
     setDraggedStepIndex(index);
@@ -206,22 +244,25 @@ const FullFlashcardApp = () => {
 
   const handleAutoPlayStepDrop = (e, dropIndex) => {
     e.preventDefault();
-    
+
     if (draggedStepIndex === null || draggedStepIndex === dropIndex) {
       return;
     }
 
-    const newScript = [...autoPlayScript];
-    const draggedStep = newScript[draggedStepIndex];
-    
-    // 移除拖曳的步驟
-    newScript.splice(draggedStepIndex, 1);
-    
-    // 插入到新位置
-    const adjustedDropIndex = draggedStepIndex < dropIndex ? dropIndex - 1 : dropIndex;
-    newScript.splice(adjustedDropIndex, 0, draggedStep);
-    
-    setAutoPlayScript(newScript);
+    updateCurrentScript(script => {
+      const newScript = [...script];
+      const draggedStep = newScript[draggedStepIndex];
+
+      // 移除拖曳的步驟
+      newScript.splice(draggedStepIndex, 1);
+
+      // 插入到新位置
+      const adjustedDropIndex = draggedStepIndex < dropIndex ? dropIndex - 1 : dropIndex;
+      newScript.splice(adjustedDropIndex, 0, draggedStep);
+
+      return newScript;
+    });
+
     setDraggedStepIndex(null);
   };
 
@@ -382,51 +423,51 @@ const FullFlashcardApp = () => {
 
   // 創建預設的5個頁面腳本
   const createDefaultPages = () => [
-    { 
-      id: 'page1', 
-      name: '基本', 
-      displayFields: ['kanji', 'meaning'], 
+    {
+      id: 'page1',
+      name: '基本',
+      displayFields: ['kanji', 'meaning'],
       script: [
-        { type: 'speak', field: 'kanji', repeat: 2, rate: 0.8 }, 
-        { type: 'pause', duration: 1000 }, 
-        { type: 'speak', field: 'meaning', repeat: 1, rate: 1.0 }
-      ] 
+        { type: 'speak', field: 'kanji', repeat: 2, rate: 0.8, pauseMode: 'sentence', sentenceMultiplier: 1.0 },
+        { type: 'pause', duration: 1000 },
+        { type: 'speak', field: 'meaning', repeat: 1, rate: 1.0, pauseMode: 'sentence', sentenceMultiplier: 1.0 }
+      ]
     },
-    { 
-      id: 'page2', 
-      name: '練習', 
-      displayFields: ['kanji', 'hiragana', 'meaning'], 
+    {
+      id: 'page2',
+      name: '練習',
+      displayFields: ['kanji', 'hiragana', 'meaning'],
       script: [
-        { type: 'speak', field: 'kanji', repeat: 1, rate: 1.0 },
+        { type: 'speak', field: 'kanji', repeat: 1, rate: 1.0, pauseMode: 'sentence', sentenceMultiplier: 1.0 },
         { type: 'pause', duration: 500 },
-        { type: 'speak', field: 'hiragana', repeat: 1, rate: 0.9 }
-      ] 
+        { type: 'speak', field: 'hiragana', repeat: 1, rate: 0.9, pauseMode: 'sentence', sentenceMultiplier: 1.0 }
+      ]
     },
-    { 
-      id: 'page3', 
-      name: '例句', 
-      displayFields: ['example'], 
+    {
+      id: 'page3',
+      name: '例句',
+      displayFields: ['example'],
       script: [
-        { type: 'speak', field: 'example', repeat: 1, rate: 0.9 }
-      ] 
+        { type: 'speak', field: 'example', repeat: 1, rate: 0.9, pauseMode: 'sentence', sentenceMultiplier: 1.0 }
+      ]
     },
-    { 
-      id: 'page4', 
-      name: '複習', 
-      displayFields: ['meaning', 'kanji'], 
+    {
+      id: 'page4',
+      name: '複習',
+      displayFields: ['meaning', 'kanji'],
       script: [
-        { type: 'speak', field: 'meaning', repeat: 1, rate: 1.0 }, 
-        { type: 'pause', duration: 2000 }, 
-        { type: 'speak', field: 'kanji', repeat: 1, rate: 1.0 }
-      ] 
+        { type: 'speak', field: 'meaning', repeat: 1, rate: 1.0, pauseMode: 'sentence', sentenceMultiplier: 1.0 },
+        { type: 'pause', duration: 2000 },
+        { type: 'speak', field: 'kanji', repeat: 1, rate: 1.0, pauseMode: 'sentence', sentenceMultiplier: 1.0 }
+      ]
     },
-    { 
-      id: 'page5', 
-      name: '測試', 
-      displayFields: ['kanji'], 
+    {
+      id: 'page5',
+      name: '測試',
+      displayFields: ['kanji'],
       script: [
-        { type: 'speak', field: 'kanji', repeat: 1, rate: 1.2 }
-      ] 
+        { type: 'speak', field: 'kanji', repeat: 1, rate: 1.2, pauseMode: 'sentence', sentenceMultiplier: 1.0 }
+      ]
     }
   ];
 
@@ -794,10 +835,22 @@ const FullFlashcardApp = () => {
 
   // Azure TTS 語音合成功能
   const speakWithAzure = useCallback(async (text, voice, azureSettings, voiceStyle = null) => {
+    // 停止之前的播放，避免迴音
+    if (currentAudioSourceRef.current) {
+      console.log('🛑 停止之前的音頻播放');
+      try {
+        currentAudioSourceRef.current.stop();
+        currentAudioSourceRef.current.disconnect();
+      } catch (e) {
+        // 忽略已經停止的錯誤
+      }
+      currentAudioSourceRef.current = null;
+    }
+
     // 清除注音標記：支援 [ふりがな] 和 （ふりがな） 兩種格式
     const cleanText = text.replace(/[\[（]([あ-んゃゅょぁぃぅぇぉっー]+)[\]）]/g, '');
     const cache = audioCache();
-    
+
     // 使用預設風格如果沒有提供
     const style = voiceStyle || {
       rate: 'medium',
@@ -809,16 +862,26 @@ const FullFlashcardApp = () => {
     // 檢查快取
     const cacheKey = cache.generateCacheKey(cleanText, voice, style);
     const cachedAudio = cache.loadFromCache(cacheKey);
-    
+
+    // 使用共享的 AudioContext
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    const audioContext = audioContextRef.current;
+
+    // 恢復 AudioContext（如果被暫停）
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume();
+    }
+
     if (cachedAudio) {
       console.log('🎵 使用快取音檔');
       // 播放快取的音檔
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const audioBuffer = await audioContext.decodeAudioData(cachedAudio);
-      
+      const audioBuffer = await audioContext.decodeAudioData(cachedAudio.slice(0)); // 使用 slice 創建副本
+
       const source = audioContext.createBufferSource();
       source.buffer = audioBuffer;
-      
+
       // 音量控制 - 提高到最大音量
       const gainNode = audioContext.createGain();
       const volumeValue = 2.0; // 提高到 200% 音量
@@ -826,9 +889,15 @@ const FullFlashcardApp = () => {
       gainNode.gain.setValueAtTime(volumeValue, audioContext.currentTime);
       source.connect(gainNode);
       gainNode.connect(audioContext.destination);
-      
+
+      // 保存當前播放的音頻源
+      currentAudioSourceRef.current = source;
+
       return new Promise((resolve, reject) => {
-        source.onended = resolve;
+        source.onended = () => {
+          currentAudioSourceRef.current = null;
+          resolve();
+        };
         source.onerror = reject;
         source.start(0);
       });
@@ -883,24 +952,17 @@ ${cleanText}
     }
 
     const audioArrayBuffer = await response.arrayBuffer();
-    
+
     // 儲存到快取
     console.log('▣ 儲存音檔到快取');
     cache.saveToCache(cacheKey, audioArrayBuffer);
-    
-    // 播放音檔
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    
-    // 恢復 AudioContext（如果被暫停）
-    if (audioContext.state === 'suspended') {
-      await audioContext.resume();
-    }
-    
+
+    // audioContext 已經在前面初始化了
     const audioBuffer = await audioContext.decodeAudioData(audioArrayBuffer);
-    
+
     const source = audioContext.createBufferSource();
     source.buffer = audioBuffer;
-    
+
     // 設定音量 - 提高到最大音量
     const gainNode = audioContext.createGain();
     const volumeValue = 2.0; // 提高到 200% 音量
@@ -908,17 +970,22 @@ ${cleanText}
     gainNode.gain.setValueAtTime(volumeValue, audioContext.currentTime);
     source.connect(gainNode);
     gainNode.connect(audioContext.destination);
-    
+
+    // 保存當前播放的音頻源
+    currentAudioSourceRef.current = source;
+
     return new Promise((resolve, reject) => {
       source.onended = () => {
         console.log('▣ Azure TTS 音檔播放完成');
+        currentAudioSourceRef.current = null;
         resolve();
       };
       source.onerror = (error) => {
         console.error('▣ Azure TTS 音檔播放錯誤:', error);
+        currentAudioSourceRef.current = null;
         reject(error);
       };
-      
+
       console.log('▣ 開始播放 Azure TTS 音檔');
       source.start(0);
     });
@@ -1042,44 +1109,80 @@ ${cleanText}
   // 腳本播放引擎
   const executeScript = useCallback(async (card, pageIndex = 0) => {
     if (!card?.pages?.[pageIndex]) return;
-    
+
     console.log('開始執行腳本:', card.pages[pageIndex]?.name, '步驟數量:', card.pages[pageIndex]?.script?.length);
-    
+
+    // 重置播放控制標誌
+    playbackControlRef.current.shouldContinue = true;
     setIsPlaying(true);
     const page = card.pages[pageIndex];
-    let shouldContinue = true; // 使用本地變數來控制播放狀態
 
     try {
       let lastAudioDuration = 0; // 記錄上一個音檔的長度
-      
-      for (let i = 0; i < page.script.length && shouldContinue; i++) {
+      let lastTextLength = 0; // 記錄上一個文本的長度
+
+      for (let i = 0; i < page.script.length && playbackControlRef.current.shouldContinue; i++) {
         const step = page.script[i];
         console.log(`執行步驟 ${i + 1}/${page.script.length}:`, step);
 
         switch (step.type) {
+          case 'display':
+            // 切換顯示模板
+            if (step.templateId) {
+              console.log(`🎭 切換顯示模板: ${currentTemplate} → ${step.templateId}`);
+              setCurrentTemplate(step.templateId);
+              // 等待一下確保模板切換完成並觸發重新渲染
+              await new Promise(resolve => setTimeout(resolve, 100));
+              console.log(`✅ 模板切換完成: ${step.templateId}`);
+            }
+            break;
+
           case 'speak':
             const text = card.fields[step.field];
             if (text) {
               console.log('播放文本:', text);
               const repeatCount = step.repeat || 1;
               let totalDuration = 0;
-              
-              for (let r = 0; r < repeatCount && shouldContinue; r++) {
+
+              // 計算文本長度（移除注音符號）
+              const cleanText = text.replace(/\[.*?\]/g, '');
+              lastTextLength = cleanText.length;
+
+              for (let r = 0; r < repeatCount && playbackControlRef.current.shouldContinue; r++) {
                 console.log(`重複播放 ${r + 1}/${repeatCount}`);
                 const startTime = Date.now();
-                await speak(text, { 
+                await speak(text, {
                   rate: step.rate || settings.defaultRate,
-                  fieldKey: step.field 
+                  fieldKey: step.field
                 });
                 const duration = Date.now() - startTime;
                 totalDuration += duration;
-                
-                if (r < repeatCount - 1) {
+
+                // 每次播放後的暫停處理（支持句長倍速）
+                if (step.pauseMode === 'sentence' && step.sentenceMultiplier) {
+                  const basePauseTime = lastTextLength * 100; // 每個字100毫秒基準
+                  const adjustedPauseTime = basePauseTime * step.sentenceMultiplier;
+                  console.log(`句長暫停 (第${r + 1}次後): ${cleanText} (${lastTextLength}字) × ${step.sentenceMultiplier} = ${adjustedPauseTime}ms`);
+
+                  // 可中斷的暫停
+                  const startPause = Date.now();
+                  while (Date.now() - startPause < adjustedPauseTime && playbackControlRef.current.shouldContinue) {
+                    await new Promise(resolve => setTimeout(resolve, Math.min(100, adjustedPauseTime - (Date.now() - startPause))));
+                  }
+                  totalDuration += adjustedPauseTime;
+                } else if (step.pauseAfter && step.pauseAfter > 0) {
+                  console.log(`固定暫停: ${step.pauseAfter}ms`);
+                  const startPause = Date.now();
+                  while (Date.now() - startPause < step.pauseAfter && playbackControlRef.current.shouldContinue) {
+                    await new Promise(resolve => setTimeout(resolve, Math.min(100, step.pauseAfter - (Date.now() - startPause))));
+                  }
+                  totalDuration += step.pauseAfter;
+                } else if (r < repeatCount - 1) {
                   await new Promise(resolve => setTimeout(resolve, 300));
                   totalDuration += 300;
                 }
               }
-              
+
               lastAudioDuration = totalDuration;
             } else {
               console.log('警告: 找不到欄位內容:', step.field);
@@ -1096,13 +1199,17 @@ ${cleanText}
               pauseDuration = step.duration || 1000;
               console.log('使用固定暫停:', pauseDuration, 'ms');
             }
-            await new Promise(resolve => setTimeout(resolve, pauseDuration));
+            // 可中斷的暫停：每 100ms 檢查一次是否需要停止
+            const startPause = Date.now();
+            while (Date.now() - startPause < pauseDuration && playbackControlRef.current.shouldContinue) {
+              await new Promise(resolve => setTimeout(resolve, Math.min(100, pauseDuration - (Date.now() - startPause))));
+            }
             break;
         }
-        
+
         console.log(`步驟 ${i + 1} 完成`);
       }
-      
+
       console.log('腳本執行完成');
     } catch (error) {
       console.error('播放錯誤:', error);
@@ -1110,10 +1217,11 @@ ${cleanText}
       console.log('設置 isPlaying 為 false');
       setIsPlaying(false);
     }
-  }, [speak, settings.defaultRate]);
+  }, [speak, settings.defaultRate, currentTemplate, setCurrentTemplate]);
 
   const stopPlayback = useCallback(() => {
     console.log('用戶手動停止播放');
+    playbackControlRef.current.shouldContinue = false; // 停止腳本執行
     setIsPlaying(false);
     if (window.speechSynthesis) {
       speechSynthesis.cancel();
@@ -4943,6 +5051,382 @@ ${cleanText}
     );
   };
 
+  // 全部卡片自動播放狀態
+  const [autoPlayAllCards, setAutoPlayAllCards] = useState([]); // 要播放的卡片列表
+  const [autoPlayAllIndex, setAutoPlayAllIndex] = useState(0); // 當前播放的卡片索引
+  const [autoPlayAllScriptIndex, setAutoPlayAllScriptIndex] = useState(0); // 使用的腳本索引
+  const [isAutoPlayingAll, setIsAutoPlayingAll] = useState(false); // 是否正在自動播放所有卡片
+
+  // 全部卡片自動播放視圖
+  // 使用 useMemo 防止組件在父組件重新渲染時被重新創建，避免無限卸載→掛載循環
+  const AutoPlayAllView = useMemo(() => {
+    return function AutoPlayAllViewComponent() {
+    const isPlayingRef = useRef(false);
+    const playSessionIdRef = useRef(0); // 播放 session ID，用於防止多個播放循環
+    const hasStartedRef = useRef(false); // 標記是否已經啟動過播放
+
+    // 使用 local state 來管理顯示，避免觸發父組件重新渲染
+    const [displayCard, setDisplayCard] = useState(null);
+    const [localTemplate, setLocalTemplate] = useState('A'); // 組件內部的模板 state
+    const [currentCardIndex, setCurrentCardIndex] = useState(0); // 當前卡片索引（僅用於顯示）
+
+    // 註冊更新模板的回調
+    useEffect(() => {
+      updateTemplateCallbackRef.current = (templateId) => {
+        setLocalTemplate(templateId);
+      };
+      return () => {
+        updateTemplateCallbackRef.current = null;
+      };
+    }, []);
+
+    // 停止自動播放
+    const stopAutoPlayAll = useCallback(() => {
+      console.log('🛑 停止自動播放');
+      playbackControlRef.current.shouldContinue = false;
+      setIsAutoPlayingAll(false);
+      setIsPlaying(false);
+      hasStartedRef.current = false; // 重置標記
+      globalAutoPlayLockRef.current = false; // 釋放全局鎖
+      console.log('🔓 釋放全局播放鎖 (手動停止)');
+
+      // 停止語音播放
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+
+      // 停止 Azure TTS 音訊
+      if (currentAudioSourceRef.current) {
+        try {
+          currentAudioSourceRef.current.stop();
+          currentAudioSourceRef.current.disconnect();
+        } catch (e) {
+          // 忽略已經停止的錯誤
+        }
+        currentAudioSourceRef.current = null;
+      }
+
+      setCurrentView('folder');
+    }, []);
+
+    // 初始化顯示第一張卡片
+    useEffect(() => {
+      if (autoPlayAllCards.length > 0 && !displayCard) {
+        const card = autoPlayAllCards[0];
+        console.log(`📄 初始化顯示卡片 1:`, card.fields);
+        setDisplayCard({...card}); // 使用展開運算符創建新對象
+        setCurrentCardIndex(0);
+      }
+    }, [autoPlayAllCards, displayCard]);
+
+    // 移除 useEffect 監聽方案，改為直接在播放循環中更新
+
+    // 自動播放邏輯 - 只在開始時執行一次
+    useEffect(() => {
+      // 使用全局鎖防止重複執行
+      if (!isAutoPlayingAll || autoPlayAllCards.length === 0) {
+        return;
+      }
+
+      // 檢查全局鎖
+      if (globalAutoPlayLockRef.current) {
+        console.log('⚠️  全局播放鎖已啟用，跳過重複執行');
+        return;
+      }
+
+      // 啟用全局鎖
+      globalAutoPlayLockRef.current = true;
+      console.log('🔒 啟用全局播放鎖');
+
+      // 標記已經啟動
+      hasStartedRef.current = true;
+      isPlayingRef.current = true;
+
+      // 生成新的全局 session ID
+      const currentSessionId = ++globalSessionIdRef.current;
+      playSessionIdRef.current = currentSessionId;
+      console.log(`🎬 開始新的播放 session: ${currentSessionId}`);
+
+      // 確保停止之前的播放
+      console.log('🛑 停止所有正在進行的播放...');
+      playbackControlRef.current.shouldContinue = false;
+      setIsPlaying(false);
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+
+      // 標記開始播放
+      isPlayingRef.current = true;
+
+      // 等待一下確保之前的播放已經停止
+      const startPlayback = async () => {
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        // 檢查全局 session ID 是否仍然有效
+        if (globalSessionIdRef.current !== currentSessionId) {
+          console.log(`❌ Session ${currentSessionId} 已被取代，停止播放`);
+          isPlayingRef.current = false;
+          globalAutoPlayLockRef.current = false;
+          return;
+        }
+
+        playbackControlRef.current.shouldContinue = true;
+        setIsPlaying(true);
+
+        try {
+          for (let i = 0; i < autoPlayAllCards.length; i++) {
+            // 檢查全局 session ID 是否仍然有效
+            if (globalSessionIdRef.current !== currentSessionId) {
+              console.log(`❌ Session ${currentSessionId} 已被新 session 取代，停止播放`);
+              break;
+            }
+
+            // 檢查是否被中止
+            if (!playbackControlRef.current.shouldContinue) {
+              console.log('❌ 播放被用戶中止');
+              break;
+            }
+
+            const card = autoPlayAllCards[i];
+            console.log(`\n=== 🎵 播放卡片 ${i + 1}/${autoPlayAllCards.length} ===`);
+            console.log('卡片欄位:', card.fields);
+
+            // 確保卡片有正確的 pages 結構（使用深拷貝避免污染原始資料）
+            let currentCard = card;
+            if (!card.pages || !Array.isArray(card.pages) || card.pages.length === 0) {
+              console.log('⚠️ 卡片沒有腳本，建立預設腳本');
+              // 創建新對象，不要修改原始資料
+              currentCard = {
+                ...card,
+                pages: createDefaultPages(card.fields)
+              };
+            }
+
+            // 同步更新卡片索引和顯示卡片（使用深拷貝強制 React 重新渲染）
+            console.log(`🔄 切換到卡片 ${i + 1}`);
+            setCurrentCardIndex(i);
+            const cardCopy = JSON.parse(JSON.stringify(currentCard));
+            setDisplayCard(cardCopy);
+            console.log(`✅ 已更新 displayCard 為卡片 ${i + 1}:`, cardCopy.fields);
+
+            // 重置模板為預設值，讓腳本可以控制模板切換
+            currentAutoPlayTemplateRef.current = 'A';
+            setLocalTemplate('A');
+            console.log('🔄 重置模板為 A');
+
+            // 等待頁面更新（增加延遲確保渲染完成）
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // 執行當前腳本的每個步驟（使用處理後的 currentCard）
+            const page = currentCard.pages[autoPlayAllScriptIndex];
+            const scriptName = page?.name || '未命名腳本';
+            const scriptSteps = page?.script || [];
+            console.log(`▶️ 開始播放腳本: ${scriptName} (${scriptSteps.length} 個步驟)`);
+            console.log(`📄 顯示頁面: ${page?.name}，欄位: ${page?.displayFields?.join(', ')}`);
+
+            // 使用 executeAutoPlayStep 逐步執行
+            for (let stepIndex = 0; stepIndex < scriptSteps.length; stepIndex++) {
+              // 檢查全局 session ID 是否仍然有效
+              if (globalSessionIdRef.current !== currentSessionId) {
+                console.log(`❌ Session ${currentSessionId} 在步驟執行時被取代`);
+                break;
+              }
+
+              if (!playbackControlRef.current.shouldContinue) {
+                console.log('❌ 播放被用戶中止');
+                break;
+              }
+
+              const step = scriptSteps[stepIndex];
+              console.log(`📍 執行步驟 ${stepIndex + 1}/${scriptSteps.length}:`, step);
+
+              // 執行步驟（speak, pause, display）
+              await executeAutoPlayStep(currentCard, step);
+            }
+
+            console.log(`✅ 腳本播放完成: ${scriptName}`);
+
+            // 檢查是否被中止
+            if (!playbackControlRef.current.shouldContinue) {
+              console.log('❌ 播放被用戶中止');
+              break;
+            }
+
+            // 卡片之間的短暫間隔
+            if (i < autoPlayAllCards.length - 1) {
+              console.log('⏳ 等待 500ms 後播放下一張...');
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
+          }
+
+          console.log('\n=== 🎉 自動播放完成！ ===');
+        } catch (error) {
+          console.error('❌ 自動播放錯誤:', error);
+        } finally {
+          // 只有當前有效的 session 才能清理資源和返回視圖
+          if (globalSessionIdRef.current === currentSessionId) {
+            console.log(`✅ Session ${currentSessionId} 正常結束`);
+            isPlayingRef.current = false;
+            setIsPlaying(false);
+            setIsAutoPlayingAll(false);
+            globalAutoPlayLockRef.current = false; // 釋放全局鎖
+            console.log('🔓 釋放全局播放鎖 (播放完成)');
+            // 播放完成後返回資料夾視圖
+            if (playbackControlRef.current.shouldContinue) {
+              console.log('✅ 播放正常完成，返回資料夾視圖');
+              setCurrentView('folder');
+            }
+          } else {
+            console.log(`⚠️ Session ${currentSessionId} 已被取代，跳過 cleanup`);
+          }
+        }
+      };
+
+      startPlayback();
+
+      // Cleanup function
+      return () => {
+        console.log('🧹 清理自動播放資源');
+        isPlayingRef.current = false;
+        playbackControlRef.current.shouldContinue = false;
+        globalAutoPlayLockRef.current = false; // 釋放全局鎖
+        console.log('🔓 釋放全局播放鎖');
+      };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isAutoPlayingAll]);
+
+    if (!displayCard) return null;
+
+    const currentFields = currentFolder?.customFields || DEFAULT_FIELDS;
+    const currentPage = displayCard.pages[autoPlayAllScriptIndex] || displayCard.pages[0];
+    const template = displayTemplates[localTemplate] || displayTemplates['A'];
+    // 使用模板的 fields，因為腳本的 display 步驟是要切換模板
+    const displayFields = template.fields || [];
+
+    console.log('🎴 顯示卡片:', currentCardIndex + 1, '/', autoPlayAllCards.length);
+    console.log('📄 當前頁面:', currentPage?.name);
+    console.log('🎭 當前模板:', localTemplate);
+    console.log('📋 模板定義:', template);
+    console.log('🔖 顯示欄位:', displayFields);
+
+    return (
+      <div style={{
+        minHeight: '100vh',
+        backgroundColor: '#1f2937',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px'
+      }}>
+        {/* 播放進度指示 */}
+        <div style={{
+          position: 'absolute',
+          top: '20px',
+          left: '20px',
+          color: 'white',
+          fontSize: '14px',
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          padding: '8px 12px',
+          borderRadius: '6px'
+        }}>
+          卡片 {currentCardIndex + 1}/{autoPlayAllCards.length}
+          <br />
+          腳本：{displayCard.pages[autoPlayAllScriptIndex]?.name}
+        </div>
+
+        {/* 停止按鈕 */}
+        <button
+          onClick={stopAutoPlayAll}
+          style={{
+            position: 'absolute',
+            top: '20px',
+            right: '20px',
+            backgroundColor: '#dc2626',
+            color: 'white',
+            border: 'none',
+            padding: '12px 20px',
+            borderRadius: '8px',
+            fontSize: '16px',
+            cursor: 'pointer'
+          }}
+        >
+          ⏹ 停止播放
+        </button>
+
+        {/* 卡片顯示區域 */}
+        <div
+          key={`card-${currentCardIndex}`}
+          style={{
+          backgroundColor: 'white',
+          borderRadius: '16px',
+          padding: '40px',
+          maxWidth: '800px',
+          width: '90%',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.2)'
+        }}>
+          <div style={{ fontSize: '18px', color: '#6b7280', marginBottom: '20px', textAlign: 'center' }}>
+            {currentPage?.name}
+          </div>
+
+          {displayFields.map((fieldKey, index) => {
+            const field = currentFields[fieldKey];
+            const value = displayCard.fields[fieldKey];
+
+            if (!value) return null;
+
+            return (
+              <div
+                key={fieldKey}
+                style={{
+                  marginBottom: index < displayFields.length - 1 ? '20px' : '0',
+                  textAlign: 'center'
+                }}
+              >
+                {/* 隱藏欄位名稱,只顯示內容 */}
+                {field?.type === 'kanji' ? (
+                  <div style={{
+                    fontSize: '32px',
+                    lineHeight: 1.8,
+                    color: '#1f2937',
+                    fontWeight: 'bold'
+                  }}>
+                    <KanjiWithFurigana text={value} showFurigana={settings.showFurigana} />
+                  </div>
+                ) : (
+                  <div style={{
+                    fontSize: field?.type === 'meaning' ? '24px' : '20px',
+                    lineHeight: 1.6,
+                    color: '#374151'
+                  }}>
+                    {value}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+    }; // end of AutoPlayAllViewComponent
+  }, [
+    autoPlayAllCards,
+    isAutoPlayingAll,
+    currentFolder,
+    displayTemplates,
+    autoPlayScript,
+    settings,
+    playbackControlRef,
+    updateTemplateCallbackRef,
+    globalAutoPlayLockRef,
+    globalSessionIdRef,
+    currentAudioSourceRef,
+    audioContextRef,
+    setIsAutoPlayingAll,
+    setIsPlaying,
+    setCurrentView
+  ]); // end of useMemo
+
   // 學習模式視圖
   const StudyView = () => {
     const cards = currentFolder?.cards || [];
@@ -5038,32 +5522,47 @@ ${cleanText}
 
     // 保存腳本
     const saveScript = () => {
-      const updatedFolders = folders.map(folder => 
-        folder.id === currentFolder.id 
+      // 更新所有卡片的相同腳本索引
+      const updatedFolders = folders.map(folder =>
+        folder.id === currentFolder.id
           ? {
               ...folder,
-              cards: folder.cards.map(c => 
-                c.id === card.id 
-                  ? {
-                      ...c,
-                      pages: c.pages.map((page, idx) => 
-                        idx === currentScriptIndex 
-                          ? { ...page, script: editingScript }
-                          : page
-                      )
-                    }
-                  : c
-              )
+              cards: folder.cards.map(c => {
+                // 為所有卡片更新相同索引的腳本
+                if (!c.pages || c.pages.length <= currentScriptIndex) {
+                  // 如果卡片沒有足夠的 pages，建立預設的
+                  const newPages = [...(c.pages || [])];
+                  while (newPages.length <= currentScriptIndex) {
+                    newPages.push({
+                      id: `script-${newPages.length}`,
+                      name: '基本',
+                      script: []
+                    });
+                  }
+                  c.pages = newPages;
+                }
+
+                return {
+                  ...c,
+                  pages: c.pages.map((page, idx) =>
+                    idx === currentScriptIndex
+                      ? { ...page, script: editingScript }
+                      : page
+                  )
+                };
+              })
             }
           : folder
       );
-      
+
       setFolders(updatedFolders);
-      
+
       // 更新 currentFolder
       const updatedCurrentFolder = updatedFolders.find(f => f.id === currentFolder.id);
       setCurrentFolder(updatedCurrentFolder);
-      
+
+      console.log(`✅ 已將腳本更新套用到所有 ${updatedCurrentFolder.cards.length} 張卡片`);
+
       setIsEditingScript(false);
       setEditingScript([]);
       setShowFieldSelector(false);
@@ -5096,6 +5595,45 @@ ${cleanText}
         setCurrentCardIndex(currentCardIndex - 1);
         setCurrentPageIndex(0);
       }
+    };
+
+    // 順序播放所有卡片
+    const startSequentialPlayback = () => {
+      if (cards.length === 0) {
+        alert('沒有可播放的卡片');
+        return;
+      }
+
+      // 設置播放列表（順序）
+      setAutoPlayAllCards(cards);
+      setAutoPlayAllIndex(0);
+      setAutoPlayAllScriptIndex(currentScriptIndex);
+      currentAutoPlayTemplateRef.current = 'A'; // 重置為預設模板
+      setIsAutoPlayingAll(true);
+
+      // 切換到自動播放視圖
+      setCurrentView('autoplayall');
+    };
+
+    // 隨機播放所有卡片
+    const startRandomPlayback = () => {
+      if (cards.length === 0) {
+        alert('沒有可播放的卡片');
+        return;
+      }
+
+      // 創建隨機順序的卡片列表
+      const shuffledCards = [...cards].sort(() => Math.random() - 0.5);
+
+      // 設置播放列表（隨機）
+      setAutoPlayAllCards(shuffledCards);
+      setAutoPlayAllIndex(0);
+      setAutoPlayAllScriptIndex(currentScriptIndex);
+      currentAutoPlayTemplateRef.current = 'A'; // 重置為預設模板
+      setIsAutoPlayingAll(true);
+
+      // 切換到自動播放視圖
+      setCurrentView('autoplayall');
     };
 
     return (
@@ -5317,10 +5855,10 @@ ${cleanText}
           <div style={styles.flexCenter}>
             <button
               onClick={() => executeScript(card, currentScriptIndex)}
-              disabled={isPlaying}
-              style={{ 
-                ...styles.button, 
-                backgroundColor: isPlaying ? '#9ca3af' : '#2563eb',
+              disabled={isPlaying || isAutoPlayingAll}
+              style={{
+                ...styles.button,
+                backgroundColor: (isPlaying || isAutoPlayingAll) ? '#9ca3af' : '#2563eb',
                 padding: '12px 24px',
                 fontSize: '16px'
               }}
@@ -5329,10 +5867,10 @@ ${cleanText}
             </button>
             <button
               onClick={stopPlayback}
-              disabled={!isPlaying}
-              style={{ 
-                ...styles.buttonRed, 
-                backgroundColor: !isPlaying ? '#9ca3af' : '#dc2626',
+              disabled={!isPlaying && !isAutoPlayingAll}
+              style={{
+                ...styles.buttonRed,
+                backgroundColor: (!isPlaying && !isAutoPlayingAll) ? '#9ca3af' : '#dc2626',
                 padding: '12px 24px',
                 fontSize: '16px'
               }}
@@ -5340,11 +5878,24 @@ ${cleanText}
               ⏹️ 停止
             </button>
             <button
-              onClick={startEditingScript}
-              disabled={isPlaying || isEditingScript}
-              style={{ 
+              onClick={() => {
+                // 打開腳本設定對話框
+                const currentCard = cards[currentCardIndex];
+                if (currentCard) {
+                  // 確保卡片有正確的 pages 結構
+                  if (!currentCard.pages || !Array.isArray(currentCard.pages) || currentCard.pages.length === 0) {
+                    currentCard.pages = createDefaultPages(currentCard.fields);
+                  }
+                  setEditingCard(currentCard);
+                  setEditingScriptIndex(currentScriptIndex);
+                  setShowAutoPlayEditor(true);
+                  setCurrentPlaySettingTab('script'); // 切換到腳本設定分頁
+                }
+              }}
+              disabled={isPlaying || isAutoPlayingAll}
+              style={{
                 ...styles.button,
-                backgroundColor: isEditingScript ? '#9ca3af' : '#6b7280',
+                backgroundColor: '#6b7280',
                 padding: '12px 24px',
                 fontSize: '16px'
               }}
@@ -5353,14 +5904,41 @@ ${cleanText}
             </button>
             <button
               onClick={() => setSettings({ ...settings, showFurigana: !settings.showFurigana })}
-              style={{ 
-                ...styles.buttonGreen, 
+              style={{
+                ...styles.buttonGreen,
                 backgroundColor: settings.showFurigana ? '#16a34a' : '#6b7280',
                 padding: '12px 24px',
                 fontSize: '16px'
               }}
             >
               {settings.showFurigana ? '👁️' : '🙈'} 注音
+            </button>
+          </div>
+
+          <div style={{ ...styles.flexCenter, marginTop: '15px' }}>
+            <button
+              onClick={startSequentialPlayback}
+              disabled={isPlaying || isAutoPlayingAll}
+              style={{
+                ...styles.button,
+                backgroundColor: (isPlaying || isAutoPlayingAll) ? '#9ca3af' : '#10b981',
+                padding: '12px 24px',
+                fontSize: '16px'
+              }}
+            >
+              📋 順序播放
+            </button>
+            <button
+              onClick={startRandomPlayback}
+              disabled={isPlaying || isAutoPlayingAll}
+              style={{
+                ...styles.button,
+                backgroundColor: (isPlaying || isAutoPlayingAll) ? '#9ca3af' : '#8b5cf6',
+                padding: '12px 24px',
+                fontSize: '16px'
+              }}
+            >
+              🔀 隨機播放
             </button>
           </div>
 
@@ -5390,249 +5968,6 @@ ${cleanText}
           </div>
         </div>
 
-        {/* 腳本編輯器 */}
-        {isEditingScript && (
-          <div style={{ ...styles.card, marginTop: '20px' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '20px' }}>
-              📝 播放腳本編輯 - {card.pages[currentScriptIndex]?.name}
-            </h3>
-            
-            <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f3f4f6', borderRadius: '6px' }}>
-              <h4 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '10px', color: '#6b7280' }}>
-                ℹ️ 當前腳本預覽 (點擊編輯，拖曳排序)
-              </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {editingScript.map((step, index) => (
-                  <div 
-                    key={index} 
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, index)}
-                    onDragOver={handleDragOver}
-                    onDragEnd={handleDragEnd}
-                    onDrop={(e) => handleDrop(e, index)}
-                    style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '10px',
-                      padding: '8px 12px',
-                      backgroundColor: draggedIndex === index ? '#f3f4f6' : 'white',
-                      borderRadius: '4px',
-                      border: draggedIndex === index ? '2px dashed #2563eb' : '1px solid #e5e7eb',
-                      cursor: 'grab',
-                      opacity: draggedIndex === index ? 0.5 : 1,
-                      transform: draggedIndex === index ? 'rotate(2deg)' : 'none',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    <span style={{ fontSize: '12px', color: '#9ca3af', minWidth: '15px' }}>⋮⋮</span>
-                    <span style={{ fontSize: '16px', minWidth: '20px' }}>{index + 1}.</span>
-                    
-                    {editingStepIndex === index ? (
-                      // 編輯模式
-                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        {step.type === 'speak' ? (
-                          <>
-                            <select
-                              value={step.field}
-                              onChange={(e) => updateStep(index, { ...step, field: e.target.value })}
-                              style={{ padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
-                            >
-                              {Object.entries(currentFields).map(([fieldKey, fieldConfig]) => (
-                                <option key={fieldKey} value={fieldKey}>{fieldConfig.label}</option>
-                              ))}
-                            </select>
-                            <input
-                              type="number"
-                              value={step.repeat || 1}
-                              onChange={(e) => updateStep(index, { ...step, repeat: parseInt(e.target.value) })}
-                              style={{ width: '60px', padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
-                              min="1"
-                              max="5"
-                            />
-                            <span style={{ fontSize: '12px' }}>次</span>
-                            <input
-                              type="number"
-                              value={step.rate || 1.0}
-                              onChange={(e) => updateStep(index, { ...step, rate: parseFloat(e.target.value) })}
-                              style={{ width: '60px', padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
-                              step="0.1"
-                              min="0.5"
-                              max="2.0"
-                            />
-                            <span style={{ fontSize: '12px' }}>x速</span>
-                          </>
-                        ) : step.type === 'pause' ? (
-                          <>
-                            <span style={{ fontSize: '14px' }}>⏸️ 暫停</span>
-                            <select
-                              value={step.intervalType || 'fixed'}
-                              onChange={(e) => {
-                                const isMultiplier = e.target.value === 'multiplier';
-                                updateStep(index, { 
-                                  ...step, 
-                                  intervalType: e.target.value,
-                                  multiplier: isMultiplier ? (step.multiplier || 1.0) : undefined,
-                                  duration: isMultiplier ? undefined : (step.duration || 1000)
-                                });
-                              }}
-                              style={{ padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
-                            >
-                              <option value="fixed">固定時間</option>
-                              <option value="multiplier">音檔倍數</option>
-                            </select>
-                            
-                            {step.intervalType === 'multiplier' ? (
-                              <>
-                                <select
-                                  value={step.multiplier || 1.0}
-                                  onChange={(e) => updateStep(index, { ...step, multiplier: parseFloat(e.target.value) })}
-                                  style={{ padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
-                                >
-                                  <option value="0.5">0.5x</option>
-                                  <option value="1.0">1.0x</option>
-                                  <option value="1.5">1.5x</option>
-                                  <option value="2.0">2.0x</option>
-                                </select>
-                                <span style={{ fontSize: '12px' }}>前段音檔長度</span>
-                              </>
-                            ) : (
-                              <>
-                                <input
-                                  type="number"
-                                  value={step.duration || 1000}
-                                  onChange={(e) => updateStep(index, { ...step, duration: parseInt(e.target.value) })}
-                                  style={{ width: '80px', padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
-                                  min="100"
-                                  max="5000"
-                                  step="100"
-                                />
-                                <span style={{ fontSize: '12px' }}>毫秒</span>
-                              </>
-                            )}
-                          </>
-                        ) : null}
-                        <button
-                          style={{ ...styles.buttonGreen, padding: '4px 8px', fontSize: '12px' }}
-                          onClick={() => setEditingStepIndex(null)}
-                        >
-                          ✓
-                        </button>
-                      </div>
-                    ) : (
-                      // 顯示模式
-                      <>
-                        {step.type === 'speak' ? (
-                          <span 
-                            style={{ flex: 1, cursor: 'pointer', padding: '4px 8px', borderRadius: '4px' }}
-                            onClick={() => setEditingStepIndex(index)}
-                          >
-                            🗣️ 播放「{currentFields[step.field]?.label || step.field}」
-                            {step.repeat > 1 && ` × ${step.repeat}`}
-                            {step.rate !== 1.0 && ` (${step.rate}x速度)`}
-                          </span>
-                        ) : step.type === 'pause' ? (
-                          <span 
-                            style={{ flex: 1, cursor: 'pointer', padding: '4px 8px', borderRadius: '4px' }}
-                            onClick={() => setEditingStepIndex(index)}
-                          >
-                            ⏸️ 暫停 {step.intervalType === 'multiplier' 
-                              ? `${step.multiplier || 1.0}x 前段音檔長度` 
-                              : `${step.duration}ms`}
-                          </span>
-                        ) : (
-                          <span style={{ flex: 1 }}>
-                            ❓ 未知類型: {step.type}
-                          </span>
-                        )}
-                        <button
-                          style={{ ...styles.buttonRed, padding: '4px 8px', fontSize: '12px' }}
-                          onClick={() => deleteStep(index)}
-                        >
-                          🗑️
-                        </button>
-                      </>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f3f4f6', borderRadius: '6px' }}>
-              <h4 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '15px', color: '#6b7280' }}>
-                ➕ 新增腳本步驟
-              </h4>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-                <div>
-                  <button
-                    style={{ ...styles.button, padding: '15px', fontSize: '14px', width: '100%', marginBottom: '10px' }}
-                    onClick={() => setShowFieldSelector(!showFieldSelector)}
-                  >
-                    🗣️ 新增語音播放
-                  </button>
-                  {showFieldSelector && (
-                    <div style={{ 
-                      display: 'grid', 
-                      gridTemplateColumns: 'repeat(2, 1fr)', 
-                      gap: '5px',
-                      padding: '10px',
-                      backgroundColor: 'white',
-                      borderRadius: '4px',
-                      border: '1px solid #e5e7eb'
-                    }}>
-                      {Object.entries(currentFields).map(([fieldKey, fieldConfig]) => (
-                        <button
-                          key={fieldKey}
-                          style={{ 
-                            ...styles.buttonGray, 
-                            padding: '8px 12px', 
-                            fontSize: '12px',
-                            textAlign: 'left'
-                          }}
-                          onClick={() => {
-                            addSpeakStep(fieldKey);
-                            setShowFieldSelector(false);
-                          }}
-                        >
-                          {fieldConfig.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <button
-                    style={{ ...styles.button, padding: '15px', fontSize: '14px', backgroundColor: '#6b7280', width: '100%', marginBottom: '10px' }}
-                    onClick={() => addPauseStep()}
-                  >
-                    ⏸️ 新增固定暫停
-                  </button>
-                  <button
-                    style={{ ...styles.button, padding: '10px', fontSize: '12px', backgroundColor: '#059669', width: '100%' }}
-                    onClick={() => addPauseStep(0, 'multiplier')}
-                  >
-                    📐 新增倍數暫停
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
-              <button
-                style={{ ...styles.button, backgroundColor: '#16a34a' }}
-                onClick={() => saveScript()}
-              >
-                💾 儲存腳本
-              </button>
-              <button
-                style={styles.buttonGray}
-                onClick={() => setIsEditingScript(false)}
-              >
-                ❌ 取消編輯
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* 模板編輯器已整合到播放設定的頁面設定分頁中 */}
       </div>
     );
@@ -5645,52 +5980,80 @@ ${cleanText}
     switch (step.type) {
       case 'display':
         // 切換顯示模板 - 立即切換，不等待時間
-        setCurrentAutoPlayTemplate(step.templateId);
-        console.log('切換到模板:', step.templateId);
+        console.log(`🎭 切換顯示模板: 從 ${currentAutoPlayTemplateRef.current} → ${step.templateId}`);
+        currentAutoPlayTemplateRef.current = step.templateId;
+        // 通知 AutoPlayAllView 更新顯示
+        if (updateTemplateCallbackRef.current) {
+          updateTemplateCallbackRef.current(step.templateId);
+        }
+        // 等待一下確保模板切換完成並觸發重新渲染
+        await new Promise(resolve => setTimeout(resolve, 300));
+        console.log(`✅ 模板切換完成: ${step.templateId}`);
         break;
         
       case 'speak':
         // 語音播放
         const fieldValue = card.fields[step.field];
         console.log(`執行語音播放: 欄位=${step.field}, 內容="${fieldValue}", 重複=${step.repeat || 1}次`);
-        
+
         if (fieldValue && fieldValue.trim()) {
           try {
             // 獲取該欄位的語音設定
             const fieldVoiceSetting = fieldVoiceSettings[step.field] || fieldVoiceSettings['kanji']; // 默認使用kanji設定
             console.log(`使用語音設定:`, fieldVoiceSetting);
-            
+
+            // 計算句長暫停時間（如果需要）
+            const cleanText = fieldValue.replace(/\[.*?\]/g, ''); // 移除注音符號
+            const sentenceLength = cleanText.length;
+
             for (let i = 0; i < (step.repeat || 1); i++) {
-              console.log(`語音播放第 ${i + 1} 次: "${fieldValue}"`);
-              
+              // 檢查是否被中止
+              if (!playbackControlRef.current.shouldContinue) {
+                console.log('⏹ 播放被中止');
+                return;
+              }
+
+              console.log(`語音播放第 ${i + 1}/${step.repeat || 1} 次: "${fieldValue}"`);
+
               // 使用欄位特定的語音設定
-              await speak(fieldValue, { 
+              await speak(fieldValue, {
                 voice: fieldVoiceSetting.voice,
                 rate: fieldVoiceSetting.rate,
                 pitch: fieldVoiceSetting.pitch,
                 style: fieldVoiceSetting.style
               });
-              
-              if (i < (step.repeat || 1) - 1) {
-                // 重複之間的短暫停頓
+
+              // 每次播放後的暫停處理
+              console.log(`⏸️  暫停模式檢查: pauseMode=${step.pauseMode}, sentenceMultiplier=${step.sentenceMultiplier}, pauseAfter=${step.pauseAfter}`);
+
+              if (step.pauseMode === 'sentence' && step.sentenceMultiplier) {
+                // 依照句長倍速暫停
+                const basePauseTime = sentenceLength * 100; // 每個字100毫秒基準
+                const adjustedPauseTime = basePauseTime * step.sentenceMultiplier;
+
+                console.log(`⏱️  句長暫停 (第${i + 1}次後): "${cleanText}" (${sentenceLength}字) × ${step.sentenceMultiplier} = ${adjustedPauseTime}ms`);
+
+                // 可中斷的暫停
+                const startPause = Date.now();
+                while (Date.now() - startPause < adjustedPauseTime && playbackControlRef.current.shouldContinue) {
+                  await new Promise(resolve => setTimeout(resolve, Math.min(100, adjustedPauseTime - (Date.now() - startPause))));
+                }
+                console.log(`✅ 句長暫停完成`);
+              } else if (step.pauseAfter && step.pauseAfter > 0) {
+                // 固定時間暫停（可中斷）
+                console.log(`⏱️  固定暫停: ${step.pauseAfter}ms`);
+                const startPause = Date.now();
+                while (Date.now() - startPause < step.pauseAfter && playbackControlRef.current.shouldContinue) {
+                  await new Promise(resolve => setTimeout(resolve, Math.min(100, step.pauseAfter - (Date.now() - startPause))));
+                }
+                console.log(`✅ 固定暫停完成`);
+              } else if (i < (step.repeat || 1) - 1) {
+                // 如果沒有設定暫停模式，且不是最後一次，使用預設短暫停頓
+                console.log(`⏱️  預設暫停: 200ms`);
                 await new Promise(resolve => setTimeout(resolve, 200));
+              } else {
+                console.log(`⏭️  無暫停設定`);
               }
-            }
-            
-            // 後續暫停處理
-            if (step.pauseMode === 'sentence' && step.sentenceMultiplier) {
-              // 依照句長倍速暫停
-              const cleanText = fieldValue.replace(/\[.*?\]/g, ''); // 移除注音符號
-              const sentenceLength = cleanText.length;
-              const basePauseTime = sentenceLength * 100; // 每個字100毫秒基準
-              const adjustedPauseTime = basePauseTime * step.sentenceMultiplier;
-              
-              console.log(`句長暫停: ${cleanText} (${sentenceLength}字) × ${step.sentenceMultiplier} = ${adjustedPauseTime}ms`);
-              await new Promise(resolve => setTimeout(resolve, adjustedPauseTime));
-            } else if (step.pauseAfter && step.pauseAfter > 0) {
-              // 固定時間暫停
-              console.log(`固定暫停: ${step.pauseAfter}ms`);
-              await new Promise(resolve => setTimeout(resolve, step.pauseAfter));
             }
           } catch (error) {
             console.error(`語音播放錯誤 (欄位: ${step.field}):`, error);
@@ -5702,8 +6065,13 @@ ${cleanText}
         break;
         
       case 'pause':
-        // 靜音暫停
-        await new Promise(resolve => setTimeout(resolve, step.duration || 1000));
+        // 靜音暫停（可中斷）
+        const pauseDuration = step.duration || 1000;
+        console.log(`靜音暫停: ${pauseDuration}ms`);
+        const startPause = Date.now();
+        while (Date.now() - startPause < pauseDuration && playbackControlRef.current.shouldContinue) {
+          await new Promise(resolve => setTimeout(resolve, Math.min(100, pauseDuration - (Date.now() - startPause))));
+        }
         break;
         
       default:
@@ -6006,7 +6374,17 @@ ${cleanText}
             <button
               onClick={() => {
                 console.log('自動播放設定按鈕被點擊');
-                setShowAutoPlayEditor(true);
+                // 打開第一張卡片的腳本編輯器
+                if (currentFolder.cards.length > 0) {
+                  const card = currentFolder.cards[0];
+                  // 確保卡片有正確的 pages 結構
+                  if (!card.pages || !Array.isArray(card.pages) || card.pages.length === 0) {
+                    card.pages = createDefaultPages(card.fields);
+                  }
+                  setEditingCard(card);
+                  setEditingScriptIndex(0);
+                  setShowAutoPlayEditor(true);
+                }
               }}
               disabled={currentFolder.cards.length === 0}
               title="自動播放設定"
@@ -6021,63 +6399,6 @@ ${cleanText}
             >
               ⚙
             </button>
-            <button
-              onClick={() => {
-                console.log('自動播放按鈕被點擊, isAutoPlaying:', isAutoPlaying);
-                if (isAutoPlaying) {
-                  console.log('執行停止播放');
-                  stopAutoPlay();
-                } else {
-                  console.log('執行開始播放');
-                  startAutoPlay();
-                }
-              }}
-              disabled={currentFolder.cards.length === 0}
-              title={isAutoPlaying ? `停止播放 (${currentAutoPlayCard + 1}/${currentFolder.cards.length})` : '自動播放'}
-              style={{
-                ...styles.button,
-                backgroundColor: isAutoPlaying ? '#dc2626' : '#10b981',
-                minWidth: isMobile ? '44px' : '50px',
-                padding: isMobile ? '12px' : '10px 16px',
-                fontSize: isMobile ? '22px' : '20px',
-                fontWeight: '400'
-              }}
-            >
-              {isAutoPlaying ? '■' : '▶'}
-            </button>
-            <button
-              onClick={() => {
-                console.log('隨機播放按鈕被點擊, isPlaying:', isPlaying);
-                startRandomPlayback();
-              }}
-              disabled={currentFolder.cards.length === 0 || isPlaying}
-              title={isPlaying ? '播放中...' : '隨機播放'}
-              style={{
-                ...styles.button,
-                backgroundColor: isPlaying ? '#9ca3af' : '#10b981',
-                minWidth: isMobile ? '44px' : '50px',
-                padding: isMobile ? '12px' : '10px 16px',
-                fontSize: isMobile ? '22px' : '20px',
-                fontWeight: '400'
-              }}
-            >
-              ⊙
-            </button>
-            {isPlaying && (
-              <button
-                onClick={stopPlayback}
-                title="停止播放"
-                style={{
-                  ...styles.buttonRed,
-                  minWidth: isMobile ? '44px' : '50px',
-                  padding: isMobile ? '12px' : '10px 16px',
-                  fontSize: isMobile ? '22px' : '20px',
-                  fontWeight: '400'
-                }}
-              >
-                ■
-              </button>
-            )}
           </div>
         </div>
 
@@ -6834,6 +7155,7 @@ ${cleanText}
       {currentView === 'folder' && currentFolder && <FolderView />}
       {currentView === 'study' && currentFolder && <StudyView />}
       {currentView === 'autoplay' && currentFolder && <AutoPlayView />}
+      {currentView === 'autoplayall' && currentFolder && <AutoPlayAllView />}
 
       {/* 全域對話框 - 可在任何視圖打開 */}
       {showTTSSettings && <TTSSettingsDialog />}
@@ -6865,9 +7187,9 @@ ${cleanText}
               backgroundColor: 'white',
               borderRadius: '12px',
               padding: '24px',
-              maxWidth: '1200px',
-              width: '95%',
-              height: '90vh',
+              maxWidth: '1600px',
+              width: '98%',
+              height: '92vh',
               display: 'flex',
               flexDirection: 'column'
             }}
@@ -6941,7 +7263,60 @@ ${cleanText}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowAutoPlayEditor(false)}
+                  onClick={() => {
+                    // 保存編輯的卡片並套用到所有卡片
+                    if (editingCard) {
+                      console.log('儲存腳本:', editingCard);
+                      console.log('腳本內容:', editingCard.pages[editingScriptIndex]?.script);
+
+                      // 更新所有卡片的相同腳本索引
+                      const updatedScript = editingCard.pages[editingScriptIndex]?.script;
+                      const updatedFolders = folders.map(folder => {
+                        if (folder.id === currentFolder.id) {
+                          return {
+                            ...folder,
+                            cards: folder.cards.map(c => {
+                              // 為所有卡片更新相同索引的腳本
+                              if (!c.pages || c.pages.length <= editingScriptIndex) {
+                                // 如果卡片沒有足夠的 pages，建立預設的
+                                const newPages = [...(c.pages || [])];
+                                while (newPages.length <= editingScriptIndex) {
+                                  newPages.push({
+                                    id: `script-${newPages.length}`,
+                                    name: '基本',
+                                    script: []
+                                  });
+                                }
+                                c.pages = newPages;
+                              }
+
+                              return {
+                                ...c,
+                                pages: c.pages.map((page, idx) =>
+                                  idx === editingScriptIndex
+                                    ? { ...page, script: updatedScript }
+                                    : page
+                                )
+                              };
+                            })
+                          };
+                        }
+                        return folder;
+                      });
+
+                      setFolders(updatedFolders);
+
+                      // 更新 currentFolder
+                      const updatedCurrentFolder = updatedFolders.find(f => f.id === currentFolder.id);
+                      if (updatedCurrentFolder) {
+                        setCurrentFolder(updatedCurrentFolder);
+                      }
+
+                      console.log(`✅ 已將腳本更新套用到所有 ${updatedCurrentFolder.cards.length} 張卡片`);
+                      alert(`✅ 腳本已儲存並套用到所有 ${updatedCurrentFolder.cards.length} 張卡片！`);
+                    }
+                    setShowAutoPlayEditor(false);
+                  }}
                   style={{
                     padding: '8px 16px',
                     fontSize: '14px',
@@ -6949,14 +7324,18 @@ ${cleanText}
                     border: 'none',
                     backgroundColor: '#2563eb',
                     color: 'white',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    fontWeight: '600'
                   }}
                 >
                   💾 儲存
                 </button>
-                <button 
+                <button
                   type="button"
-                  onClick={() => setShowAutoPlayEditor(false)}
+                  onClick={() => {
+                    setShowAutoPlayEditor(false);
+                    setEditingCard(null);
+                  }}
                   style={{
                     padding: '8px 16px',
                     fontSize: '14px',
@@ -7017,78 +7396,198 @@ ${cleanText}
               minHeight: 0
             }}>
               {/* 分頁1: 腳本設定 */}
-              {currentPlaySettingTab === 'script' && (
-                <div style={{ 
-                  height: '100%', 
-                  display: 'flex', 
+              {currentPlaySettingTab === 'script' && editingCard && (
+                <div style={{
+                  height: '100%',
+                  display: 'flex',
                   flexDirection: 'column',
                   overflow: 'hidden',
-                  gap: '10px',
-                  maxHeight: '80vh'
+                  gap: '12px'
                 }}>
                   {/* 固定頭部區域 */}
-                  <div style={{ 
-                    flexShrink: 0, 
-                    paddingBottom: '10px',
-                    maxHeight: '200px',
-                    overflowY: 'auto'
+                  <div style={{
+                    flexShrink: 0,
+                    paddingBottom: '15px',
+                    borderBottom: '2px solid #e5e7eb'
                   }}>
-                    <h4 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '8px', color: '#3b82f6' }}>📜 腳本設定</h4>
-                    <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '12px' }}>設定自動播放的腳本順序：模板顯示 + 語音播放 + 暫停時間</p>
-                    
-                    {/* 播放模式選擇 */}
-                    <div style={{ marginBottom: '18px', padding: '15px', backgroundColor: '#fef7f0', borderRadius: '8px' }}>
-                      <h5 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', marginTop: '0' }}>播放方式</h5>
-                      <div style={{ display: 'flex', gap: '10px' }}>
-                        <button
-                          onClick={() => setAutoPlayMode('sequential')}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <h4 style={{ fontSize: '16px', fontWeight: 'bold', margin: 0, color: '#3b82f6' }}>📜 腳本設定</h4>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <span style={{ fontSize: '13px', color: '#6b7280' }}>當前卡片:</span>
+                        <select
+                          value={editingCard?.id || ''}
+                          onChange={(e) => {
+                            const card = currentFolder.cards.find(c => c.id === parseInt(e.target.value));
+                            if (card) {
+                              // 確保卡片有正確的 pages 結構
+                              if (!card.pages || !Array.isArray(card.pages) || card.pages.length === 0) {
+                                card.pages = createDefaultPages(card.fields);
+                              }
+                              setEditingCard(card);
+                              setEditingScriptIndex(0);
+                            }
+                          }}
                           style={{
-                            padding: '8px 16px',
-                            fontSize: '14px',
+                            padding: '6px 12px',
+                            fontSize: '13px',
                             borderRadius: '6px',
                             border: '1px solid #d1d5db',
-                            backgroundColor: autoPlayMode === 'sequential' ? '#2563eb' : 'white',
-                            color: autoPlayMode === 'sequential' ? 'white' : '#374151',
+                            backgroundColor: 'white',
                             cursor: 'pointer'
                           }}
                         >
-                          📋 順序播放
-                        </button>
+                          {currentFolder.cards.map(card => (
+                            <option key={card.id} value={card.id}>
+                              {card.fields[Object.keys(card.fields)[0]] || `卡片 ${card.id}`}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '12px', marginTop: '8px' }}>設定自動播放的腳本順序：顯示頁面 + 語音播放 + 暫停時間</p>
+
+                    {/* 腳本列表切換 */}
+                    <div style={{
+                      backgroundColor: '#f8fafc',
+                      borderRadius: '8px',
+                      padding: '12px',
+                      marginBottom: '12px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                        <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#374151' }}>腳本列表</span>
                         <button
-                          onClick={() => setAutoPlayMode('loop')}
+                          onClick={() => {
+                            const newPage = {
+                              id: `page${editingCard.pages.length + 1}`,
+                              name: `腳本 ${editingCard.pages.length + 1}`,
+                              displayFields: ['kanji', 'meaning'],
+                              script: []
+                            };
+                            const updatedCard = {
+                              ...editingCard,
+                              pages: [...editingCard.pages, newPage]
+                            };
+                            setEditingCard(updatedCard);
+                            setEditingScriptIndex(updatedCard.pages.length - 1);
+                          }}
                           style={{
-                            padding: '8px 16px',
-                            fontSize: '14px',
-                            borderRadius: '6px',
-                            border: '1px solid #d1d5db',
-                            backgroundColor: autoPlayMode === 'loop' ? '#2563eb' : 'white',
-                            color: autoPlayMode === 'loop' ? 'white' : '#374151',
+                            padding: '4px 10px',
+                            fontSize: '12px',
+                            borderRadius: '4px',
+                            border: 'none',
+                            backgroundColor: '#10b981',
+                            color: 'white',
                             cursor: 'pointer'
                           }}
                         >
-                          🔄 循環播放
+                          ➕ 新增腳本
                         </button>
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        {editingCard.pages.map((page, idx) => (
+                          <div key={page.id} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            {editingScriptIndex === idx ? (
+                              <input
+                                type="text"
+                                value={page.name}
+                                onChange={(e) => {
+                                  const updatedPages = [...editingCard.pages];
+                                  updatedPages[idx] = { ...page, name: e.target.value };
+                                  setEditingCard({ ...editingCard, pages: updatedPages });
+                                }}
+                                onBlur={() => {}}
+                                autoFocus
+                                style={{
+                                  padding: '6px 12px',
+                                  fontSize: '12px',
+                                  borderRadius: '6px',
+                                  border: '2px solid #3b82f6',
+                                  backgroundColor: '#dbeafe',
+                                  color: '#1e40af',
+                                  fontWeight: 'bold',
+                                  minWidth: '100px',
+                                  outline: 'none'
+                                }}
+                              />
+                            ) : (
+                              <button
+                                onClick={() => setEditingScriptIndex(idx)}
+                                style={{
+                                  padding: '6px 12px',
+                                  fontSize: '12px',
+                                  borderRadius: '6px',
+                                  border: '1px solid #d1d5db',
+                                  backgroundColor: 'white',
+                                  color: '#374151',
+                                  cursor: 'pointer',
+                                  fontWeight: 'normal'
+                                }}
+                              >
+                                {page.name}
+                              </button>
+                            )}
+                            {editingCard.pages.length > 1 && (
+                              <button
+                                onClick={() => {
+                                  if (confirm(`確定要刪除「${page.name}」嗎？`)) {
+                                    const updatedPages = editingCard.pages.filter((_, i) => i !== idx);
+                                    const updatedCard = { ...editingCard, pages: updatedPages };
+                                    setEditingCard(updatedCard);
+                                    if (editingScriptIndex >= updatedPages.length) {
+                                      setEditingScriptIndex(updatedPages.length - 1);
+                                    }
+                                  }
+                                }}
+                                style={{
+                                  padding: '4px 8px',
+                                  fontSize: '12px',
+                                  borderRadius: '4px',
+                                  border: 'none',
+                                  backgroundColor: '#fee2e2',
+                                  color: '#dc2626',
+                                  cursor: 'pointer'
+                                }}
+                                title={`刪除「${page.name}」`}
+                              >
+                                ×
+                              </button>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     </div>
 
-                    <h5 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '8px', marginTop: '5px' }}>播放腳本</h5>
-                    <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '12px' }}>
-                      💡 可拖曳 ⋮⋮ 符號調整步驟順序
-                    </p>
                   </div>
 
-                  {/* 可滾動的腳本編輯區域 */}
-                  <div style={{ 
-                    flex: 1, 
-                    overflowY: 'auto', 
-                    border: '1px solid #e5e7eb', 
-                    borderRadius: '6px', 
-                    padding: '15px',
-                    marginBottom: '10px',
+                  {/* 兩欄布局：左側腳本編輯，右側播放預覽 */}
+                  <div style={{
+                    flex: 1,
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 400px',
+                    gap: '15px',
                     minHeight: 0,
-                    maxHeight: '600px'
+                    marginBottom: '10px'
                   }}>
-                      {autoPlayScript.map((step, index) => (
+                    {/* 左側：可滾動的腳本編輯區域 */}
+                    <div style={{
+                      overflowY: 'auto',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '6px',
+                      padding: '15px',
+                      minHeight: 0,
+                      backgroundColor: '#fafafa'
+                    }}>
+                      <div style={{ marginBottom: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <h5 style={{ fontSize: '14px', fontWeight: 'bold', margin: 0, color: '#374151' }}>
+                            {editingCard.pages[editingScriptIndex]?.name || '腳本'} - 步驟列表
+                          </h5>
+                          <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                            💡 可拖曳 ⋮⋮ 符號調整順序
+                          </span>
+                        </div>
+                      </div>
+                      {(editingCard.pages[editingScriptIndex]?.script || []).map((step, index) => (
                         <div 
                           key={step.id} 
                           draggable
@@ -7134,16 +7633,19 @@ ${cleanText}
                                   <select
                                     value={step.templateId || 'A'}
                                     onChange={(e) => {
-                                      const newScript = [...autoPlayScript];
+                                      const newScript = [...editingCard.pages[editingScriptIndex].script];
                                       newScript[index] = { ...step, templateId: e.target.value };
-                                      setAutoPlayScript(newScript);
+                                      const updatedPages = [...editingCard.pages];
+                                      updatedPages[editingScriptIndex] = { ...updatedPages[editingScriptIndex], script: newScript };
+                                      setEditingCard({ ...editingCard, pages: updatedPages });
                                     }}
-                                    style={{ 
-                                      fontSize: '12px', 
-                                      padding: '4px 8px', 
-                                      borderRadius: '4px', 
+                                    style={{
+                                      fontSize: '12px',
+                                      padding: '6px 12px',
+                                      borderRadius: '4px',
                                       border: '1px solid #d1d5db',
-                                      backgroundColor: '#f8f9fa'
+                                      backgroundColor: '#f8f9fa',
+                                      minWidth: '120px'
                                     }}
                                   >
                                     <option value="A">模板 A</option>
@@ -7154,17 +7656,19 @@ ${cleanText}
                                   </select>
                                   <button
                                     onClick={() => {
-                                      const newScript = autoPlayScript.filter((_, i) => i !== index);
-                                      setAutoPlayScript(newScript);
+                                      const newScript = editingCard.pages[editingScriptIndex].script.filter((_, i) => i !== index);
+                                      const updatedPages = [...editingCard.pages];
+                                      updatedPages[editingScriptIndex] = { ...updatedPages[editingScriptIndex], script: newScript };
+                                      setEditingCard({ ...editingCard, pages: updatedPages });
                                     }}
-                                    style={{ 
-                                      fontSize: '12px', 
-                                      padding: '4px 8px', 
-                                      backgroundColor: '#fee2e2', 
-                                      color: '#dc2626', 
-                                      border: 'none', 
-                                      borderRadius: '4px', 
-                                      cursor: 'pointer' 
+                                    style={{
+                                      fontSize: '12px',
+                                      padding: '6px 10px',
+                                      backgroundColor: '#fee2e2',
+                                      color: '#dc2626',
+                                      border: 'none',
+                                      borderRadius: '4px',
+                                      cursor: 'pointer'
                                     }}
                                   >
                                     🗑️ 刪除
@@ -7178,40 +7682,37 @@ ${cleanText}
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
                                   <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#1f2937' }}>🎵 語音播放</span>
                                   <button
-                                    onClick={() => {
-                                      const newScript = autoPlayScript.filter((_, i) => i !== index);
-                                      setAutoPlayScript(newScript);
-                                    }}
-                                    style={{ 
-                                      fontSize: '12px', 
-                                      padding: '4px 8px', 
-                                      backgroundColor: '#fee2e2', 
-                                      color: '#dc2626', 
-                                      border: 'none', 
-                                      borderRadius: '4px', 
-                                      cursor: 'pointer' 
+                                    onClick={() => updateCurrentScript(script => script.filter((_, i) => i !== index))}
+                                    style={{
+                                      fontSize: '12px',
+                                      padding: '6px 10px',
+                                      backgroundColor: '#fee2e2',
+                                      color: '#dc2626',
+                                      border: 'none',
+                                      borderRadius: '4px',
+                                      cursor: 'pointer'
                                     }}
                                   >
                                     🗑️ 刪除
                                   </button>
                                 </div>
-                                
+
                                 {/* 第一行：基本設定 */}
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                                   <div>
-                                    <label style={{ fontSize: '12px', color: '#6b7280' }}>播放欄位</label>
+                                    <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>播放欄位</label>
                                     <select
                                       value={step.field || 'kanji'}
-                                      onChange={(e) => {
-                                        const newScript = [...autoPlayScript];
+                                      onChange={(e) => updateCurrentScript(script => {
+                                        const newScript = [...script];
                                         newScript[index] = { ...step, field: e.target.value };
-                                        setAutoPlayScript(newScript);
-                                      }}
-                                      style={{ 
-                                        width: '100%', 
-                                        fontSize: '12px', 
-                                        padding: '6px', 
-                                        borderRadius: '4px', 
+                                        return newScript;
+                                      })}
+                                      style={{
+                                        width: '100%',
+                                        fontSize: '12px',
+                                        padding: '6px',
+                                        borderRadius: '4px',
                                         border: '1px solid #d1d5db',
                                         backgroundColor: 'white'
                                       }}
@@ -7222,54 +7723,54 @@ ${cleanText}
                                     </select>
                                   </div>
                                   <div>
-                                    <label style={{ fontSize: '12px', color: '#6b7280' }}>重複次數</label>
+                                    <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>重複次數</label>
                                     <input
                                       type="number"
                                       min="1"
                                       max="10"
                                       value={step.repeat || 1}
-                                      onChange={(e) => {
-                                        const newScript = [...autoPlayScript];
+                                      onChange={(e) => updateCurrentScript(script => {
+                                        const newScript = [...script];
                                         newScript[index] = { ...step, repeat: parseInt(e.target.value) };
-                                        setAutoPlayScript(newScript);
-                                      }}
-                                      style={{ width: '100%', fontSize: '12px', padding: '4px', borderRadius: '4px', border: '1px solid #d1d5db' }}
+                                        return newScript;
+                                      })}
+                                      style={{ width: '100%', fontSize: '12px', padding: '6px', borderRadius: '4px', border: '1px solid #d1d5db' }}
                                     />
                                   </div>
                                   <div>
-                                    <label style={{ fontSize: '12px', color: '#6b7280' }}>語速</label>
+                                    <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>語速</label>
                                     <input
                                       type="number"
                                       step="0.1"
                                       min="0.5"
-                                      max="2.0"
+                                      max="4.0"
                                       value={step.rate || 1.0}
-                                      onChange={(e) => {
-                                        const newScript = [...autoPlayScript];
+                                      onChange={(e) => updateCurrentScript(script => {
+                                        const newScript = [...script];
                                         newScript[index] = { ...step, rate: parseFloat(e.target.value) };
-                                        setAutoPlayScript(newScript);
-                                      }}
-                                      style={{ width: '100%', fontSize: '12px', padding: '4px', borderRadius: '4px', border: '1px solid #d1d5db' }}
+                                        return newScript;
+                                      })}
+                                      style={{ width: '100%', fontSize: '12px', padding: '6px', borderRadius: '4px', border: '1px solid #d1d5db' }}
                                     />
                                   </div>
                                 </div>
-                                
+
                                 {/* 第二行：暫停設定 */}
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                   <div>
-                                    <label style={{ fontSize: '12px', color: '#6b7280', fontWeight: 'bold' }}>⏱️ 暫停方式</label>
+                                    <label style={{ fontSize: '12px', color: '#6b7280', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>⏱️ 暫停方式</label>
                                     <select
-                                      value={step.pauseMode || 'fixed'}
-                                      onChange={(e) => {
-                                        const newScript = [...autoPlayScript];
+                                      value={step.pauseMode || 'sentence'}
+                                      onChange={(e) => updateCurrentScript(script => {
+                                        const newScript = [...script];
                                         newScript[index] = { ...step, pauseMode: e.target.value };
-                                        setAutoPlayScript(newScript);
-                                      }}
-                                      style={{ 
-                                        width: '100%', 
-                                        fontSize: '12px', 
-                                        padding: '6px', 
-                                        borderRadius: '4px', 
+                                        return newScript;
+                                      })}
+                                      style={{
+                                        width: '100%',
+                                        fontSize: '12px',
+                                        padding: '6px',
+                                        borderRadius: '4px',
                                         border: '2px solid #10b981',
                                         backgroundColor: '#f0fdf4'
                                       }}
@@ -7281,46 +7782,82 @@ ${cleanText}
                                   <div>
                                     {step.pauseMode === 'sentence' ? (
                                       <>
-                                        <label style={{ fontSize: '12px', color: '#6b7280', fontWeight: 'bold' }}>📏 句長倍速</label>
-                                        <select
-                                          value={step.sentenceMultiplier || 1.0}
-                                          onChange={(e) => {
-                                            const newScript = [...autoPlayScript];
-                                            newScript[index] = { ...step, sentenceMultiplier: parseFloat(e.target.value) };
-                                            setAutoPlayScript(newScript);
-                                          }}
-                                          style={{ 
-                                            width: '100%', 
-                                            fontSize: '12px', 
-                                            padding: '6px', 
-                                            borderRadius: '4px', 
+                                        <label style={{ fontSize: '12px', color: '#6b7280', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>📏 句長倍速</label>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                          <button
+                                            onClick={() => updateCurrentScript(script => {
+                                              const newScript = [...script];
+                                              const currentValue = step.sentenceMultiplier || 1.0;
+                                              const newValue = Math.max(0.5, Math.round((currentValue - 0.1) * 10) / 10);
+                                              newScript[index] = { ...step, sentenceMultiplier: newValue };
+                                              return newScript;
+                                            })}
+                                            disabled={(step.sentenceMultiplier || 1.0) <= 0.5}
+                                            style={{
+                                              padding: '6px 10px',
+                                              fontSize: '14px',
+                                              borderRadius: '4px',
+                                              border: '1px solid #d1d5db',
+                                              backgroundColor: (step.sentenceMultiplier || 1.0) <= 0.5 ? '#f3f4f6' : 'white',
+                                              cursor: (step.sentenceMultiplier || 1.0) <= 0.5 ? 'not-allowed' : 'pointer',
+                                              color: (step.sentenceMultiplier || 1.0) <= 0.5 ? '#9ca3af' : '#374151'
+                                            }}
+                                          >
+                                            −
+                                          </button>
+                                          <div style={{
+                                            flex: 1,
+                                            textAlign: 'center',
+                                            fontSize: '14px',
+                                            fontWeight: 'bold',
+                                            padding: '6px',
+                                            borderRadius: '4px',
                                             border: '2px solid #3b82f6',
-                                            backgroundColor: '#eff6ff'
-                                          }}
-                                        >
-                                          <option value="0.5">🏃 0.5x (快)</option>
-                                          <option value="1.0">🚶 1.0x (標準)</option>
-                                          <option value="1.5">🐌 1.5x (慢)</option>
-                                          <option value="2.0">🦌 2.0x (很慢)</option>
-                                        </select>
+                                            backgroundColor: '#eff6ff',
+                                            color: '#1e40af'
+                                          }}>
+                                            {(step.sentenceMultiplier || 1.0).toFixed(1)}x
+                                          </div>
+                                          <button
+                                            onClick={() => updateCurrentScript(script => {
+                                              const newScript = [...script];
+                                              const currentValue = step.sentenceMultiplier || 1.0;
+                                              const newValue = Math.min(3.0, Math.round((currentValue + 0.1) * 10) / 10);
+                                              newScript[index] = { ...step, sentenceMultiplier: newValue };
+                                              return newScript;
+                                            })}
+                                            disabled={(step.sentenceMultiplier || 1.0) >= 3.0}
+                                            style={{
+                                              padding: '6px 10px',
+                                              fontSize: '14px',
+                                              borderRadius: '4px',
+                                              border: '1px solid #d1d5db',
+                                              backgroundColor: (step.sentenceMultiplier || 1.0) >= 3.0 ? '#f3f4f6' : 'white',
+                                              cursor: (step.sentenceMultiplier || 1.0) >= 3.0 ? 'not-allowed' : 'pointer',
+                                              color: (step.sentenceMultiplier || 1.0) >= 3.0 ? '#9ca3af' : '#374151'
+                                            }}
+                                          >
+                                            +
+                                          </button>
+                                        </div>
                                       </>
                                     ) : (
                                       <>
-                                        <label style={{ fontSize: '12px', color: '#6b7280', fontWeight: 'bold' }}>⏰ 固定暫停時間</label>
+                                        <label style={{ fontSize: '12px', color: '#6b7280', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>⏰ 固定暫停時間(毫秒)</label>
                                         <input
                                           type="number"
                                           placeholder="毫秒"
                                           value={step.pauseAfter || 0}
-                                          onChange={(e) => {
-                                            const newScript = [...autoPlayScript];
+                                          onChange={(e) => updateCurrentScript(script => {
+                                            const newScript = [...script];
                                             newScript[index] = { ...step, pauseAfter: parseInt(e.target.value) };
-                                            setAutoPlayScript(newScript);
-                                          }}
-                                          style={{ 
-                                            width: '100%', 
-                                            fontSize: '12px', 
-                                            padding: '6px', 
-                                            borderRadius: '4px', 
+                                            return newScript;
+                                          })}
+                                          style={{
+                                            width: '100%',
+                                            fontSize: '12px',
+                                            padding: '6px',
+                                            borderRadius: '4px',
                                             border: '2px solid #f59e0b',
                                             backgroundColor: '#fefbf0'
                                           }}
@@ -7337,33 +7874,30 @@ ${cleanText}
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
                                   <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#1f2937' }}>⏸️ 靜音暫停</span>
                                   <button
-                                    onClick={() => {
-                                      const newScript = autoPlayScript.filter((_, i) => i !== index);
-                                      setAutoPlayScript(newScript);
-                                    }}
-                                    style={{ 
-                                      fontSize: '12px', 
-                                      padding: '4px 8px', 
-                                      backgroundColor: '#fee2e2', 
-                                      color: '#dc2626', 
-                                      border: 'none', 
-                                      borderRadius: '4px', 
-                                      cursor: 'pointer' 
+                                    onClick={() => updateCurrentScript(script => script.filter((_, i) => i !== index))}
+                                    style={{
+                                      fontSize: '12px',
+                                      padding: '6px 10px',
+                                      backgroundColor: '#fee2e2',
+                                      color: '#dc2626',
+                                      border: 'none',
+                                      borderRadius: '4px',
+                                      cursor: 'pointer'
                                     }}
                                   >
                                     🗑️ 刪除
                                   </button>
                                 </div>
-                                <label style={{ fontSize: '12px', color: '#6b7280' }}>暫停時間(毫秒)</label>
+                                <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>暫停時間(毫秒)</label>
                                 <input
                                   type="number"
                                   value={step.duration || 1000}
-                                  onChange={(e) => {
-                                    const newScript = [...autoPlayScript];
+                                  onChange={(e) => updateCurrentScript(script => {
+                                    const newScript = [...script];
                                     newScript[index] = { ...step, duration: parseInt(e.target.value) };
-                                    setAutoPlayScript(newScript);
-                                  }}
-                                  style={{ width: '100%', fontSize: '12px', padding: '4px', borderRadius: '4px', border: '1px solid #d1d5db', marginTop: '5px' }}
+                                    return newScript;
+                                  })}
+                                  style={{ width: '100%', fontSize: '12px', padding: '6px', borderRadius: '4px', border: '1px solid #d1d5db' }}
                                 />
                               </div>
                             )}
@@ -7372,82 +7906,250 @@ ${cleanText}
                       ))}
                     </div>
 
+                    {/* 右側：播放預覽 */}
+                    <div style={{
+                      overflowY: 'auto',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '6px',
+                      padding: '15px',
+                      backgroundColor: '#f8fafc',
+                      minHeight: 0
+                    }}>
+                      <h5 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', color: '#374151', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>📺</span>
+                        播放預覽
+                      </h5>
+
+                      {/* 預覽信息 */}
+                      <div style={{
+                        padding: '12px',
+                        backgroundColor: '#eff6ff',
+                        borderRadius: '8px',
+                        marginBottom: '15px',
+                        border: '1px solid #bfdbfe'
+                      }}>
+                        <div style={{ fontSize: '12px', color: '#1e40af', marginBottom: '6px' }}>
+                          <strong>📋 順序播放模式</strong>
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#3b82f6' }}>
+                          共 {editingCard.pages[editingScriptIndex]?.script?.length || 0} 個步驟 • 預計每張卡約 {Math.ceil((editingCard.pages[editingScriptIndex]?.script?.length || 0) * 2)} 秒
+                        </div>
+                      </div>
+
+                      {/* 腳本流程預覽 */}
+                      <h5 style={{
+                        fontSize: '13px',
+                        fontWeight: 'bold',
+                        marginBottom: '10px',
+                        color: '#059669',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}>
+                        <span>📜</span>
+                        腳本流程預覽
+                      </h5>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {(editingCard.pages[editingScriptIndex]?.script || []).map((step, index) => (
+                          <div
+                            key={step.id}
+                            style={{
+                              padding: '10px 12px',
+                              backgroundColor: 'white',
+                              borderRadius: '6px',
+                              border: '1px solid #e5e7eb',
+                              fontSize: '12px',
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                              <span style={{
+                                width: '20px',
+                                height: '20px',
+                                borderRadius: '50%',
+                                backgroundColor: '#3b82f6',
+                                color: 'white',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0
+                              }}>
+                                {index + 1}
+                              </span>
+                              <span style={{ fontWeight: 'bold', color: '#374151' }}>
+                                {step.type === 'display' && '📱 顯示模板'}
+                                {step.type === 'speak' && '🎵 語音播放'}
+                                {step.type === 'pause' && '⏸️ 暫停'}
+                              </span>
+                            </div>
+                            <div style={{ marginLeft: '28px', color: '#6b7280', fontSize: '11px' }}>
+                              {step.type === 'display' && `模板 ${step.templateId}`}
+                              {step.type === 'speak' && (
+                                <>
+                                  <div>欄位: {getCurrentFields()[step.field]?.label || step.field}</div>
+                                  <div>重複: {step.repeat || 1}次 • 語速: {step.rate || 1.0}x</div>
+                                  {step.pauseMode === 'sentence' ? (
+                                    <div>暫停: 依句長 {step.sentenceMultiplier || 1.0}倍</div>
+                                  ) : (
+                                    <div>暫停: {step.pauseAfter || 0}ms</div>
+                                  )}
+                                </>
+                              )}
+                              {step.type === 'pause' && `時長: ${step.duration || 1000}ms`}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* 如果沒有步驟 */}
+                      {(!editingCard.pages[editingScriptIndex]?.script || editingCard.pages[editingScriptIndex].script.length === 0) && (
+                        <div style={{
+                          padding: '30px',
+                          textAlign: 'center',
+                          color: '#9ca3af',
+                          fontSize: '13px',
+                          border: '2px dashed #d1d5db',
+                          borderRadius: '8px',
+                          backgroundColor: 'white'
+                        }}>
+                          尚未新增任何步驟<br/>
+                          點擊下方按鈕開始建立腳本
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   {/* 固定底部：添加步驟按鈕 */}
-                  <div style={{ flexShrink: 0 }}>
+                  <div style={{ flexShrink: 0, paddingTop: '15px', borderTop: '2px solid #e5e7eb' }}>
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button
-                        onClick={() => {
-                          const newScript = [...autoPlayScript];
-                          newScript.push({
-                            id: Date.now().toString(),
-                            type: 'display',
-                            templateId: 'A'
-                          });
-                          setAutoPlayScript(newScript);
-                        }}
-                        style={{ 
+                        onClick={() => updateCurrentScript(script => [...script, {
+                          id: Date.now().toString(),
+                          type: 'display',
+                          templateId: 'A'
+                        }])}
+                        style={{
                           flex: 1,
-                          padding: '8px 12px',
-                          fontSize: '12px',
-                          borderRadius: '4px',
-                          border: '1px solid #d1d5db',
-                          backgroundColor: '#f3f4f6',
-                          color: '#374151',
-                          cursor: 'pointer'
+                          padding: '10px 12px',
+                          fontSize: '13px',
+                          borderRadius: '6px',
+                          border: '1px solid #3b82f6',
+                          backgroundColor: 'white',
+                          color: '#3b82f6',
+                          cursor: 'pointer',
+                          fontWeight: '500'
                         }}
                       >
                         ➕ 顯示模板
                       </button>
                       <button
-                        onClick={() => {
-                          const newScript = [...autoPlayScript];
-                          newScript.push({
-                            id: Date.now().toString(),
-                            type: 'speak',
-                            field: 'kanji',
-                            repeat: 1,
-                            rate: 1.0,
-                            pauseAfter: 1000
-                          });
-                          setAutoPlayScript(newScript);
-                        }}
-                        style={{ 
+                        onClick={() => updateCurrentScript(script => [...script, {
+                          id: Date.now().toString(),
+                          type: 'speak',
+                          field: Object.keys(getCurrentFields())[0] || 'kanji',
+                          repeat: 1,
+                          rate: 1.0,
+                          pauseMode: 'sentence',
+                          sentenceMultiplier: 1.0,
+                          pauseAfter: 1000
+                        }])}
+                        style={{
                           flex: 1,
-                          padding: '8px 12px',
-                          fontSize: '12px',
-                          borderRadius: '4px',
-                          border: '1px solid #d1d5db',
-                          backgroundColor: '#f3f4f6',
-                          color: '#374151',
-                          cursor: 'pointer'
+                          padding: '10px 12px',
+                          fontSize: '13px',
+                          borderRadius: '6px',
+                          border: '1px solid #10b981',
+                          backgroundColor: 'white',
+                          color: '#10b981',
+                          cursor: 'pointer',
+                          fontWeight: '500'
                         }}
                       >
                         ➕ 語音播放
                       </button>
                       <button
-                        onClick={() => {
-                          const newScript = [...autoPlayScript];
-                          newScript.push({
-                            id: Date.now().toString(),
-                            type: 'pause',
-                            duration: 1000
-                          });
-                          setAutoPlayScript(newScript);
-                        }}
-                        style={{ 
+                        onClick={() => updateCurrentScript(script => [...script, {
+                          id: Date.now().toString(),
+                          type: 'pause',
+                          duration: 1000
+                        }])}
+                        style={{
                           flex: 1,
-                          padding: '8px 12px',
-                          fontSize: '12px',
-                          borderRadius: '4px',
-                          border: '1px solid #d1d5db',
-                          backgroundColor: '#f3f4f6',
-                          color: '#374151',
-                          cursor: 'pointer'
+                          padding: '10px 12px',
+                          fontSize: '13px',
+                          borderRadius: '6px',
+                          border: '1px solid #f59e0b',
+                          backgroundColor: 'white',
+                          color: '#f59e0b',
+                          cursor: 'pointer',
+                          fontWeight: '500'
                         }}
                       >
                         ➕ 靜音暫停
                       </button>
                     </div>
+                  </div>
+
+                  {/* 底部測試和播放按鈕 */}
+                  <div style={{
+                    marginTop: 'auto',
+                    padding: '20px 24px',
+                    backgroundColor: '#f8f9fa',
+                    display: 'flex',
+                    gap: '12px',
+                    flexShrink: 0,
+                    borderTop: '1px solid #e5e7eb'
+                  }}>
+                    <button
+                      onClick={async () => {
+                        if (editingCard && editingCard.pages[editingScriptIndex]) {
+                          await executeScript(editingCard, editingScriptIndex);
+                        } else {
+                          alert('請先選擇卡片和腳本');
+                        }
+                      }}
+                      disabled={!editingCard || !editingCard.pages[editingScriptIndex]}
+                      style={{
+                        flex: 1,
+                        padding: '12px 20px',
+                        fontSize: '14px',
+                        fontWeight: 'bold',
+                        borderRadius: '8px',
+                        border: 'none',
+                        backgroundColor: '#f59e0b',
+                        color: 'white',
+                        cursor: 'pointer',
+                        opacity: (!editingCard || !editingCard.pages[editingScriptIndex]) ? 0.5 : 1
+                      }}
+                    >
+                      🎮 測試播放此腳本
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowAutoPlayEditor(false);
+                        if (currentFolder?.cards?.length > 0) {
+                          startAutoPlay();
+                        }
+                      }}
+                      disabled={!currentFolder?.cards?.length}
+                      style={{
+                        flex: 1,
+                        padding: '12px 20px',
+                        fontSize: '14px',
+                        fontWeight: 'bold',
+                        borderRadius: '8px',
+                        border: 'none',
+                        backgroundColor: '#dc2626',
+                        color: 'white',
+                        cursor: 'pointer',
+                        opacity: !currentFolder?.cards?.length ? 0.5 : 1
+                      }}
+                    >
+                      🎭 開始自動播放
+                    </button>
                   </div>
                 </div>
               )}
@@ -8042,556 +8744,10 @@ ${cleanText}
                 </div>
               )}
             </div>
-
-            {/* 底部測試和播放按鈕 - 只在腳本設定分頁顯示 */}
-            {currentPlaySettingTab === 'script' && (
-              <>
-                <div style={{ 
-                  marginTop: 'auto', 
-                  padding: '20px 24px', 
-                  backgroundColor: '#f8f9fa', 
-                  display: 'flex', 
-                  gap: '12px', 
-                  flexShrink: 0,
-                  borderTop: '1px solid #e5e7eb',
-                  marginLeft: '-24px',
-                  marginRight: '-24px',
-                  marginBottom: '-24px',
-                  borderBottomLeftRadius: '12px',
-                  borderBottomRightRadius: '12px'
-                }}>
-                  <ClickableWrapper
-                    designMode={designMode}
-                    elementId="test-play-button"
-                    onSelect={setSelectedElement}
-                    isSelected={selectedElement?.id === 'test-play-button'}
-                    customStyle={customStyles['test-play-button']}
-                  >
-                    <button
-                      onClick={async () => {
-                        if (designMode) return; // 設計模式下不執行
-                        console.log('🎮 測試播放按鈕被點擊');
-
-                        if (currentFolder?.cards?.length > 0) {
-                          const testCard = currentFolder.cards[0];
-                          setCurrentCard(testCard);
-                          setCurrentAutoPlayCard(0);
-                          setCurrentView('autoplay');
-                          setShowAutoPlayEditor(false);
-
-                          try {
-                            for (let i = 0; i < autoPlayScript.length; i++) {
-                              const step = autoPlayScript[i];
-                              setCurrentAutoPlayStep(i);
-                              console.log(`測試執行步驟 ${i + 1}/${autoPlayScript.length}:`, step);
-                              await executeAutoPlayStep(testCard, step);
-                              await new Promise(resolve => setTimeout(resolve, 300));
-                            }
-
-                            setTimeout(() => {
-                              setCurrentView('folder');
-                              alert('測試播放完成！');
-                            }, 1000);
-                          } catch (error) {
-                            console.error('測試播放錯誤:', error);
-                            setCurrentView('folder');
-                            alert('測試播放失敗：' + error.message);
-                          }
-                        } else {
-                          alert('沒有可用的卡片進行測試');
-                        }
-                      }}
-                      disabled={currentFolder?.cards?.length === 0 || designMode}
-                      style={{
-                        flex: 1,
-                        padding: '12px 20px',
-                        fontSize: '14px',
-                        fontWeight: 'bold',
-                        borderRadius: '8px',
-                        border: 'none',
-                        backgroundColor: designMode ? '#cbd5e1' : '#f59e0b',
-                        color: 'white',
-                        cursor: designMode ? 'default' : 'pointer',
-                        ...(customStyles['test-play-button'] || {})
-                      }}
-                    >
-                      🎮 測試播放
-                    </button>
-                  </ClickableWrapper>
-                <button
-                  onClick={() => {
-                    setShowAutoPlayEditor(false);
-                    startAutoPlay();
-                  }}
-                  disabled={currentFolder?.cards?.length === 0}
-                  style={{ 
-                    flex: 1,
-                    padding: '12px 20px',
-                    fontSize: '14px',
-                    fontWeight: 'bold',
-                    borderRadius: '8px',
-                    border: 'none',
-                    backgroundColor: '#dc2626',
-                    color: 'white',
-                    cursor: 'pointer'
-                  }}
-                >
-                  🎭 開始自動播放
-                </button>
-              </div>
-            
-              {/* 播放腳本編輯 */}
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                  <h5 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '5px' }}>播放腳本</h5>
-                  <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '10px', margin: 0 }}>
-                    💡 可拖曳 ⋮⋮ 符號調整步驟順序
-                  </p>
-                  <div style={{ flex: 1, overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '10px', minHeight: '200px', maxHeight: '350px' }}>
-                    {autoPlayScript.map((step, index) => (
-                      <div 
-                        key={step.id} 
-                        draggable
-                        onDragStart={(e) => handleAutoPlayStepDragStart(e, index)}
-                        onDragOver={handleAutoPlayStepDragOver}
-                        onDrop={(e) => handleAutoPlayStepDrop(e, index)}
-                        onDragEnd={handleAutoPlayStepDragEnd}
-                        style={{ 
-                          marginBottom: '10px', 
-                          padding: '12px', 
-                          backgroundColor: draggedStepIndex === index ? '#e0f2fe' : '#f9fafb', 
-                          borderRadius: '6px',
-                          border: draggedStepIndex === index ? '2px solid #0284c7' : '1px solid #e5e7eb',
-                          cursor: 'move',
-                          opacity: draggedStepIndex === index ? 0.7 : 1,
-                          transform: draggedStepIndex === index ? 'rotate(2deg)' : 'none',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '14px', color: '#6b7280', cursor: 'move' }}>⋮⋮</span>
-                            <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#374151' }}>步驟 {index + 1}</span>
-                          </div>
-                          <div style={{ display: 'flex', gap: '5px' }}>
-                            <select
-                              value={step.type}
-                              onChange={(e) => {
-                                const newScript = [...autoPlayScript];
-                                newScript[index] = { ...step, type: e.target.value };
-                                setAutoPlayScript(newScript);
-                              }}
-                              style={{ fontSize: '12px', padding: '4px 8px', borderRadius: '4px', border: '1px solid #d1d5db' }}
-                            >
-                              <option value="display">📱 顯示頁面</option>
-                              <option value="speak">🗣️ 語音播放</option>
-                              <option value="pause">⏸️ 靜音暫停</option>
-                            </select>
-                            <button
-                              onClick={() => {
-                                const newScript = autoPlayScript.filter((_, i) => i !== index);
-                                setAutoPlayScript(newScript);
-                              }}
-                              style={{ 
-                                fontSize: '12px', 
-                                padding: '4px 8px', 
-                                borderRadius: '4px', 
-                                border: '1px solid #ef4444',
-                                backgroundColor: '#ef4444',
-                                color: 'white',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              🗑️
-                            </button>
-                          </div>
-                        </div>
-                        
-                        {step.type === 'display' && (
-                          <div>
-                            <label style={{ fontSize: '12px', color: '#6b7280', fontWeight: 'bold' }}>📱 顯示模板 (立即切換)</label>
-                            <select
-                              value={step.templateId || 'A'}
-                              onChange={(e) => {
-                                const newScript = [...autoPlayScript];
-                                newScript[index] = { ...step, templateId: e.target.value };
-                                setAutoPlayScript(newScript);
-                              }}
-                              style={{ 
-                                width: '100%', 
-                                fontSize: '14px', 
-                                padding: '8px', 
-                                borderRadius: '6px', 
-                                border: '2px solid #3b82f6',
-                                backgroundColor: '#f0f8ff',
-                                marginTop: '4px'
-                              }}
-                            >
-                              {Object.entries(displayTemplates).map(([id, template]) => (
-                                <option key={id} value={id}>📄 模板{id} - {template.name}</option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-                        
-                        {step.type === 'speak' && (
-                          <div style={{ 
-                            padding: '10px', 
-                            backgroundColor: '#fef7f0', 
-                            borderRadius: '6px',
-                            border: '2px solid #f59e0b'
-                          }}>
-                            <label style={{ fontSize: '12px', color: '#92400e', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>
-                              🗣️ 語音播放設定
-                            </label>
-                            {/* 第一行：基本設定 */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
-                              <div>
-                                <label style={{ fontSize: '12px', color: '#6b7280' }}>播放欄位</label>
-                                <select
-                                  value={step.field || 'kanji'}
-                                  onChange={(e) => {
-                                    const newScript = [...autoPlayScript];
-                                    newScript[index] = { ...step, field: e.target.value };
-                                    setAutoPlayScript(newScript);
-                                  }}
-                                  style={{ 
-                                    width: '100%', 
-                                    fontSize: '12px', 
-                                    padding: '6px', 
-                                    borderRadius: '4px', 
-                                    border: '1px solid #d1d5db',
-                                    backgroundColor: 'white'
-                                  }}
-                                >
-                                  {Object.entries(getCurrentFields()).map(([key, field]) => (
-                                    <option key={key} value={key}>{field.label}</option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div>
-                                <label style={{ fontSize: '12px', color: '#6b7280' }}>重複次數</label>
-                                <input
-                                  type="number"
-                                  min="1"
-                                  max="10"
-                                  value={step.repeat || 1}
-                                  onChange={(e) => {
-                                    const newScript = [...autoPlayScript];
-                                    newScript[index] = { ...step, repeat: parseInt(e.target.value) };
-                                    setAutoPlayScript(newScript);
-                                  }}
-                                  style={{ width: '100%', fontSize: '12px', padding: '4px', borderRadius: '4px', border: '1px solid #d1d5db' }}
-                                />
-                              </div>
-                              <div>
-                                <label style={{ fontSize: '12px', color: '#6b7280' }}>語速</label>
-                                <input
-                                  type="number"
-                                  step="0.1"
-                                  min="0.5"
-                                  max="2.0"
-                                  value={step.rate || 1.0}
-                                  onChange={(e) => {
-                                    const newScript = [...autoPlayScript];
-                                    newScript[index] = { ...step, rate: parseFloat(e.target.value) };
-                                    setAutoPlayScript(newScript);
-                                  }}
-                                  style={{ width: '100%', fontSize: '12px', padding: '4px', borderRadius: '4px', border: '1px solid #d1d5db' }}
-                                />
-                              </div>
-                            </div>
-                            
-                            {/* 第二行：暫停設定 */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                              <div>
-                                <label style={{ fontSize: '12px', color: '#6b7280', fontWeight: 'bold' }}>⏱️ 暫停方式</label>
-                                <select
-                                  value={step.pauseMode || 'fixed'}
-                                  onChange={(e) => {
-                                    const newScript = [...autoPlayScript];
-                                    newScript[index] = { ...step, pauseMode: e.target.value };
-                                    setAutoPlayScript(newScript);
-                                  }}
-                                  style={{ 
-                                    width: '100%', 
-                                    fontSize: '12px', 
-                                    padding: '6px', 
-                                    borderRadius: '4px', 
-                                    border: '2px solid #10b981',
-                                    backgroundColor: '#f0fdf4'
-                                  }}
-                                >
-                                  <option value="fixed">⏰ 固定時間</option>
-                                  <option value="sentence">📏 依句長倍速</option>
-                                </select>
-                              </div>
-                              <div>
-                                {step.pauseMode === 'sentence' ? (
-                                  <>
-                                    <label style={{ fontSize: '12px', color: '#6b7280', fontWeight: 'bold' }}>📏 句長倍速</label>
-                                    <select
-                                      value={step.sentenceMultiplier || 1.0}
-                                      onChange={(e) => {
-                                        const newScript = [...autoPlayScript];
-                                        newScript[index] = { ...step, sentenceMultiplier: parseFloat(e.target.value) };
-                                        setAutoPlayScript(newScript);
-                                      }}
-                                      style={{ 
-                                        width: '100%', 
-                                        fontSize: '12px', 
-                                        padding: '6px', 
-                                        borderRadius: '4px', 
-                                        border: '2px solid #3b82f6',
-                                        backgroundColor: '#eff6ff'
-                                      }}
-                                    >
-                                      <option value="0.5">🏃 0.5x (快)</option>
-                                      <option value="1.0">🚶 1.0x (標準)</option>
-                                      <option value="1.5">🐌 1.5x (慢)</option>
-                                      <option value="2.0">🦌 2.0x (很慢)</option>
-                                    </select>
-                                  </>
-                                ) : (
-                                  <>
-                                    <label style={{ fontSize: '12px', color: '#6b7280', fontWeight: 'bold' }}>⏰ 固定暫停時間</label>
-                                    <input
-                                      type="number"
-                                      placeholder="毫秒"
-                                      value={step.pauseAfter || 0}
-                                      onChange={(e) => {
-                                        const newScript = [...autoPlayScript];
-                                        newScript[index] = { ...step, pauseAfter: parseInt(e.target.value) };
-                                        setAutoPlayScript(newScript);
-                                      }}
-                                      style={{ 
-                                        width: '100%', 
-                                        fontSize: '12px', 
-                                        padding: '6px', 
-                                        borderRadius: '4px', 
-                                        border: '2px solid #f59e0b',
-                                        backgroundColor: '#fefbf0'
-                                      }}
-                                    />
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        
-                        {step.type === 'pause' && (
-                          <div>
-                            <label style={{ fontSize: '12px', color: '#6b7280' }}>暫停時間(毫秒)</label>
-                            <input
-                              type="number"
-                              value={step.duration || 1000}
-                              onChange={(e) => {
-                                const newScript = [...autoPlayScript];
-                                newScript[index] = { ...step, duration: parseInt(e.target.value) };
-                                setAutoPlayScript(newScript);
-                              }}
-                              style={{ width: '100%', fontSize: '12px', padding: '4px', borderRadius: '4px', border: '1px solid #d1d5db' }}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                    
-                    <div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>
-                      <button
-                        onClick={() => {
-                          setAutoPlayScript([...autoPlayScript, {
-                            id: Date.now().toString(),
-                            type: 'display',
-                            templateId: 'A'
-                          }]);
-                        }}
-                        style={{ 
-                          flex: 1,
-                          padding: '8px 12px',
-                          fontSize: '12px',
-                          borderRadius: '4px',
-                          border: '1px solid #2563eb',
-                          backgroundColor: '#2563eb',
-                          color: 'white',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        ➕ 顯示頁面
-                      </button>
-                      <button
-                        onClick={() => {
-                          setAutoPlayScript([...autoPlayScript, {
-                            id: Date.now().toString(),
-                            type: 'speak',
-                            field: 'kanji',
-                            repeat: 1,
-                            rate: 1.0,
-                            pauseAfter: 500
-                          }]);
-                        }}
-                        style={{ 
-                          flex: 1,
-                          padding: '8px 12px',
-                          fontSize: '12px',
-                          borderRadius: '4px',
-                          border: '1px solid #10b981',
-                          backgroundColor: '#10b981',
-                          color: 'white',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        ➕ 語音播放
-                      </button>
-                      <button
-                        onClick={() => {
-                          setAutoPlayScript([...autoPlayScript, {
-                            id: Date.now().toString(),
-                            type: 'pause',
-                            duration: 1000
-                          }]);
-                        }}
-                        style={{ 
-                          flex: 1,
-                          padding: '8px 12px',
-                          fontSize: '12px',
-                          borderRadius: '4px',
-                          border: '1px solid #6b7280',
-                          backgroundColor: '#6b7280',
-                          color: 'white',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        ➕ 暫停
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              
-              {/* 右側：預覽 */}
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                minHeight: 0,
-                flex: 1,
-                maxWidth: '400px'
-              }}>
-                <h4 style={{
-                  fontSize: '16px',
-                  fontWeight: '700',
-                  marginBottom: '12px',
-                  color: '#1f2937',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}>
-                  <span>📺</span>
-                  播放預覽
-                </h4>
-                <div style={{
-                  padding: '12px 15px',
-                  backgroundColor: '#eff6ff',
-                  borderRadius: '8px',
-                  marginBottom: '12px',
-                  border: '1px solid #dbeafe'
-                }}>
-                  <p style={{ fontSize: '13px', color: '#1e40af', margin: 0, fontWeight: '600' }}>
-                    {autoPlayMode === 'sequential' ? '📋 順序播放模式' : '🔄 循環播放模式'}
-                  </p>
-                  <p style={{ fontSize: '12px', color: '#3b82f6', margin: '8px 0 0 0', lineHeight: '1.5' }}>
-                    共 <strong>{autoPlayScript.length}</strong> 個步驟 • 預計每張卡片約{' '}
-                    <strong>
-                      {Math.round(autoPlayScript.reduce((total, step) => {
-                        if (step.type === 'speak') {
-                          let speakTime = 1000 * (step.repeat || 1);
-                          if (step.pauseMode === 'sentence') {
-                            // 估算: 假設平均句長5字, 每字100毫秒基準
-                            const estimatedLength = 5;
-                            const estimatedPause = estimatedLength * 100 * (step.sentenceMultiplier || 1.0);
-                            return total + speakTime + estimatedPause;
-                          } else {
-                            return total + speakTime + (step.pauseAfter || 0);
-                          }
-                        }
-                        if (step.type === 'pause') return total + (step.duration || 1000);
-                        return total;
-                      }, 0) / 1000)}
-                    </strong>
-                    {' '}秒
-                  </p>
-                </div>
-
-                <div style={{
-                  flex: 1,
-                  maxHeight: '500px',
-                  overflowY: 'auto',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  padding: '12px',
-                  backgroundColor: '#ffffff'
-                }}>
-                  <h5 style={{
-                    fontSize: '13px',
-                    fontWeight: '700',
-                    marginBottom: '12px',
-                    color: '#4b5563',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}>
-                    <span>📜</span>
-                    腳本流程預覽
-                  </h5>
-                  {autoPlayScript.map((step, index) => (
-                    <div key={step.id} style={{
-                      marginBottom: '10px',
-                      padding: '10px 12px',
-                      backgroundColor: '#f9fafb',
-                      borderRadius: '6px',
-                      border: '1px solid #e5e7eb',
-                      fontSize: '12px',
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#f3f4f6';
-                      e.currentTarget.style.borderColor = '#d1d5db';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#f9fafb';
-                      e.currentTarget.style.borderColor = '#e5e7eb';
-                    }}
-                    >
-                      <div style={{ fontWeight: 'bold', color: '#374151' }}>
-                        {index + 1}. {
-                          step.type === 'display' ? `📱 顯示模板${step.templateId}` :
-                          step.type === 'speak' ? `🗣️ 播放${getCurrentFields()[step.field]?.label} × ${step.repeat}次` :
-                          step.type === 'pause' ? `⏸️ 暫停 ${step.duration}ms` : '未知步驟'
-                        }
-                      </div>
-                      {step.type === 'display' && (
-                        <div style={{ color: '#10b981', marginTop: '4px', fontSize: '11px', fontWeight: 'bold' }}>
-                          ⚡ 立即切換 (持續顯示直到下一個模板)
-                        </div>
-                      )}
-                      {step.type === 'speak' && (
-                        <div style={{ color: '#6b7280', marginTop: '4px' }}>
-                          語速：{step.rate || 1.0}x，
-                          {step.pauseMode === 'sentence' ? 
-                            `依句長暫停 (${step.sentenceMultiplier || 1.0}x倍速)` : 
-                            `固定暫停：${step.pauseAfter || 0}毫秒`
-                          }
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-              </>
-            )}
         </div>
         </div>
       )}
-      
+
       {/* 模板編輯器已整合至播放設定的頁面設定分頁 */}
 
       {/* 設計編輯器 - 視覺化調整元素樣式 */}
