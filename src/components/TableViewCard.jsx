@@ -13,25 +13,25 @@ const TableViewCard = ({ card, fields, showFurigana = true }) => {
     table: {
       width: '100%',
       borderCollapse: 'collapse',
-      backgroundColor: 'white',
-      borderRadius: '12px',
+      backgroundColor: 'var(--paper)',
+      borderRadius: '14px',
       overflow: 'hidden',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+      boxShadow: '0 10px 30px rgba(43, 39, 34, 0.12)'
     },
     th: {
       padding: '15px 20px',
       textAlign: 'left',
-      backgroundColor: '#4F46E5',
+      backgroundColor: 'var(--accent)',
       color: 'white',
       fontWeight: '600',
       fontSize: '14px',
-      borderBottom: '2px solid #3730a3'
+      borderBottom: '2px solid var(--accent-dark)'
     },
     td: {
       padding: '15px 20px',
-      borderBottom: '1px solid #e5e7eb',
+      borderBottom: '1px solid var(--border)',
       fontSize: '16px',
-      color: '#1f2937'
+      color: 'var(--ink)'
     },
     row: {
       transition: 'background-color 0.2s',
@@ -39,9 +39,9 @@ const TableViewCard = ({ card, fields, showFurigana = true }) => {
     },
     fieldLabel: {
       fontWeight: '600',
-      color: '#4F46E5',
+      color: 'var(--accent)',
       minWidth: '120px',
-      backgroundColor: '#f9fafb'
+      backgroundColor: 'var(--paper)'
     }
   };
 
@@ -77,7 +77,7 @@ const TableViewCard = ({ card, fields, showFurigana = true }) => {
                     left: '50%',
                     transform: 'translateX(-50%)',
                     fontSize: '0.6em',
-                    color: '#6b7280',
+                    color: 'var(--muted)',
                     whiteSpace: 'nowrap'
                   }}>
                     {part.furigana}
@@ -108,7 +108,7 @@ const TableViewCard = ({ card, fields, showFurigana = true }) => {
           <tr
             key={key}
             style={styles.row}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--paper)'}
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
           >
             <td style={{ ...styles.td, ...styles.fieldLabel }}>

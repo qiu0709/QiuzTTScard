@@ -4,8 +4,8 @@
   "description": "日文單字學習閃卡應用程式，支援 Anki 匯入和 Azure TTS 語音播放",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#4F46E5",
+  "background_color": "#f7f2ea",
+  "theme_color": "#8b6a4a",
   "orientation": "portrait",
   "icons": [
     {

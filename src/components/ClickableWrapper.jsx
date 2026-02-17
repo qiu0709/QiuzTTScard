@@ -26,14 +26,14 @@ const ClickableWrapper = ({
   const wrapperStyle = designMode ? {
     position: 'relative',
     cursor: 'pointer',
-    outline: isSelected ? '3px solid #4F46E5' : '1px dashed rgba(79, 70, 229, 0.3)',
+    outline: isSelected ? '3px solid var(--accent)' : '1px dashed rgba(139, 106, 74, 0.35)',
     outlineOffset: '2px',
     transition: 'outline 0.2s',
     ...customStyle
   } : customStyle;
 
   const hoverStyle = designMode && !isSelected ? {
-    outline: '2px solid #818cf8'
+    outline: '2px solid var(--accent-light)'
   } : {};
 
   return (
@@ -48,7 +48,7 @@ const ClickableWrapper = ({
       }}
       onMouseLeave={(e) => {
         if (designMode && !isSelected) {
-          e.currentTarget.style.outline = '1px dashed rgba(79, 70, 229, 0.3)';
+          e.currentTarget.style.outline = '1px dashed rgba(139, 106, 74, 0.35)';
         }
       }}
     >
@@ -58,7 +58,7 @@ const ClickableWrapper = ({
           position: 'absolute',
           top: '-25px',
           left: '0',
-          backgroundColor: '#4F46E5',
+          backgroundColor: 'var(--accent)',
           color: 'white',
           padding: '3px 8px',
           borderRadius: '4px',

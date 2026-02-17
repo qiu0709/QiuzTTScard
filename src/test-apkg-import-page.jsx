@@ -111,7 +111,7 @@ export default function TestApkgImportPage() {
             padding: '10px 20px',
             fontSize: '16px',
             cursor: 'pointer',
-            background: '#4F46E5',
+            background: 'var(--accent)',
             color: 'white',
             border: 'none',
             borderRadius: '6px'

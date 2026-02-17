@@ -60,10 +60,10 @@ const MediaCardDisplay = ({ card, isMobile = false }) => {
 
   const styles = {
     container: {
-      backgroundColor: 'white',
-      borderRadius: '16px',
+      backgroundColor: 'var(--paper)',
+      borderRadius: '18px',
       padding: isMobile ? '16px' : '24px',
-      boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+      boxShadow: '0 12px 36px rgba(43, 39, 34, 0.12)',
       maxWidth: '800px',
       margin: '0 auto',
     },
@@ -71,14 +71,14 @@ const MediaCardDisplay = ({ card, isMobile = false }) => {
       fontSize: isMobile ? '20px' : '28px',
       fontWeight: 'bold',
       marginBottom: '20px',
-      color: '#1f2937',
+      color: 'var(--ink)',
       textAlign: 'center',
     },
     imageContainer: {
       marginBottom: '20px',
       borderRadius: '12px',
       overflow: 'hidden',
-      backgroundColor: '#f3f4f6',
+      backgroundColor: 'var(--paper)',
     },
     image: {
       width: '100%',
@@ -88,7 +88,7 @@ const MediaCardDisplay = ({ card, isMobile = false }) => {
       display: 'block',
     },
     audioControls: {
-      backgroundColor: '#F3F4F6',
+      backgroundColor: 'var(--paper)',
       borderRadius: '12px',
       padding: isMobile ? '16px' : '20px',
       marginBottom: '20px',
@@ -101,7 +101,7 @@ const MediaCardDisplay = ({ card, isMobile = false }) => {
       borderRadius: '12px',
       border: 'none',
       cursor: 'pointer',
-      backgroundColor: '#4F46E5',
+      backgroundColor: 'var(--accent)',
       color: 'white',
       marginBottom: '16px',
       transition: 'all 0.2s',
@@ -113,7 +113,7 @@ const MediaCardDisplay = ({ card, isMobile = false }) => {
     progressBar: {
       width: '100%',
       height: '6px',
-      backgroundColor: '#E5E7EB',
+      backgroundColor: 'var(--border)',
       borderRadius: '3px',
       marginBottom: '8px',
       position: 'relative',
@@ -121,7 +121,7 @@ const MediaCardDisplay = ({ card, isMobile = false }) => {
     },
     progressFill: {
       height: '100%',
-      backgroundColor: '#4F46E5',
+      backgroundColor: 'var(--accent)',
       borderRadius: '3px',
       transition: 'width 0.1s',
     },
@@ -129,7 +129,7 @@ const MediaCardDisplay = ({ card, isMobile = false }) => {
       display: 'flex',
       justifyContent: 'space-between',
       fontSize: '12px',
-      color: '#6b7280',
+      color: 'var(--muted)',
       marginBottom: '12px',
     },
     speedControl: {
@@ -138,7 +138,7 @@ const MediaCardDisplay = ({ card, isMobile = false }) => {
     speedLabel: {
       fontSize: '13px',
       fontWeight: '600',
-      color: '#374151',
+      color: 'var(--ink)',
       marginBottom: '8px',
       display: 'block',
     },
@@ -150,7 +150,7 @@ const MediaCardDisplay = ({ card, isMobile = false }) => {
       display: 'flex',
       justifyContent: 'space-between',
       fontSize: '11px',
-      color: '#9ca3af',
+      color: 'var(--muted-2)',
     },
     note: {
       backgroundColor: '#FEF3C7',
@@ -165,7 +165,7 @@ const MediaCardDisplay = ({ card, isMobile = false }) => {
     emptyState: {
       textAlign: 'center',
       padding: '40px 20px',
-      color: '#9ca3af',
+      color: 'var(--muted-2)',
       fontSize: '14px',
     },
   };
@@ -202,8 +202,8 @@ const MediaCardDisplay = ({ card, isMobile = false }) => {
           <button
             onClick={togglePlayback}
             style={styles.playButton}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#4338CA'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#4F46E5'}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--accent-dark)'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--accent)'}
           >
             <span style={{ fontSize: '24px' }}>{isPlaying ? '⏸' : '▶'}</span>
             <span>{isPlaying ? '暫停錄音' : '播放錄音'}</span>

@@ -15,7 +15,7 @@ const DesignEditor = ({ selectedElement, onStyleChange, onClose }) => {
     width: 'auto',
     height: 'auto',
     backgroundColor: 'transparent',
-    color: '#333',
+    color: 'var(--ink)',
     borderRadius: '0px',
     display: 'block',
     justifyContent: 'flex-start',
@@ -39,8 +39,8 @@ const DesignEditor = ({ selectedElement, onStyleChange, onClose }) => {
       top: 0,
       bottom: 0,
       width: '350px',
-      backgroundColor: 'white',
-      boxShadow: '-2px 0 10px rgba(0,0,0,0.1)',
+      backgroundColor: 'var(--paper)',
+      boxShadow: '-12px 0 30px rgba(43, 39, 34, 0.12)',
       zIndex: 10001,
       display: 'flex',
       flexDirection: 'column',
@@ -48,15 +48,15 @@ const DesignEditor = ({ selectedElement, onStyleChange, onClose }) => {
     },
     header: {
       padding: '20px',
-      borderBottom: '1px solid #e5e7eb',
-      backgroundColor: '#f9fafb'
+      borderBottom: '1px solid var(--border)',
+      backgroundColor: 'var(--paper)'
     },
     tabs: {
       display: 'flex',
       gap: '5px',
       padding: '10px 20px',
-      borderBottom: '1px solid #e5e7eb',
-      backgroundColor: 'white'
+      borderBottom: '1px solid var(--border)',
+      backgroundColor: 'var(--paper)'
     },
     tab: (active) => ({
       padding: '8px 16px',
@@ -64,8 +64,8 @@ const DesignEditor = ({ selectedElement, onStyleChange, onClose }) => {
       cursor: 'pointer',
       fontSize: '13px',
       fontWeight: active ? '600' : '400',
-      backgroundColor: active ? '#4F46E5' : 'transparent',
-      color: active ? 'white' : '#6b7280',
+      backgroundColor: active ? 'var(--accent)' : 'transparent',
+      color: active ? 'white' : 'var(--muted)',
       border: 'none',
       transition: 'all 0.2s'
     }),
@@ -80,7 +80,7 @@ const DesignEditor = ({ selectedElement, onStyleChange, onClose }) => {
       display: 'block',
       fontSize: '12px',
       fontWeight: '600',
-      color: '#374151',
+      color: 'var(--ink)',
       marginBottom: '8px',
       textTransform: 'uppercase',
       letterSpacing: '0.5px'
@@ -88,24 +88,26 @@ const DesignEditor = ({ selectedElement, onStyleChange, onClose }) => {
     input: {
       width: '100%',
       padding: '8px 12px',
-      border: '1px solid #d1d5db',
+      border: '1px solid var(--border)',
       borderRadius: '6px',
       fontSize: '14px',
-      fontFamily: 'monospace'
+      fontFamily: 'monospace',
+      backgroundColor: 'var(--paper)',
+      color: 'var(--ink)'
     },
     select: {
       width: '100%',
       padding: '8px 12px',
-      border: '1px solid #d1d5db',
+      border: '1px solid var(--border)',
       borderRadius: '6px',
       fontSize: '14px',
-      backgroundColor: 'white',
+      backgroundColor: 'var(--paper)',
       cursor: 'pointer'
     },
     colorInput: {
       width: '100%',
       height: '40px',
-      border: '1px solid #d1d5db',
+      border: '1px solid var(--border)',
       borderRadius: '6px',
       cursor: 'pointer'
     },
@@ -120,7 +122,7 @@ const DesignEditor = ({ selectedElement, onStyleChange, onClose }) => {
       top: '20px',
       right: '20px',
       padding: '8px 12px',
-      backgroundColor: '#ef4444',
+      backgroundColor: 'var(--danger)',
       color: 'white',
       border: 'none',
       borderRadius: '6px',
@@ -136,7 +138,7 @@ const DesignEditor = ({ selectedElement, onStyleChange, onClose }) => {
         <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700' }}>
           🎨 設計編輯器
         </h3>
-        <p style={{ margin: '5px 0 0 0', fontSize: '12px', color: '#6b7280' }}>
+        <p style={{ margin: '5px 0 0 0', fontSize: '12px', color: 'var(--muted)' }}>
           {selectedElement ? `編輯: ${selectedElement.id}` : '點擊元素來編輯'}
         </p>
         <button style={styles.closeButton} onClick={onClose}>
@@ -182,7 +184,7 @@ const DesignEditor = ({ selectedElement, onStyleChange, onClose }) => {
                         onChange={(e) => updateStyle('width', e.target.value)}
                         placeholder="auto"
                       />
-                      <small style={{ color: '#6b7280', fontSize: '11px' }}>寬度</small>
+                      <small style={{ color: 'var(--muted)', fontSize: '11px' }}>寬度</small>
                     </div>
                     <div>
                       <input
@@ -192,7 +194,7 @@ const DesignEditor = ({ selectedElement, onStyleChange, onClose }) => {
                         onChange={(e) => updateStyle('height', e.target.value)}
                         placeholder="auto"
                       />
-                      <small style={{ color: '#6b7280', fontSize: '11px' }}>高度</small>
+                      <small style={{ color: 'var(--muted)', fontSize: '11px' }}>高度</small>
                     </div>
                   </div>
                 </div>
@@ -206,7 +208,7 @@ const DesignEditor = ({ selectedElement, onStyleChange, onClose }) => {
                     onChange={(e) => updateStyle('padding', e.target.value)}
                     placeholder="10px"
                   />
-                  <small style={{ color: '#6b7280', fontSize: '11px' }}>
+                  <small style={{ color: 'var(--muted)', fontSize: '11px' }}>
                     例如: 10px 或 10px 20px
                   </small>
                 </div>
@@ -361,7 +363,7 @@ const DesignEditor = ({ selectedElement, onStyleChange, onClose }) => {
             )}
 
             {/* 快速操作 */}
-            <div style={{ ...styles.group, borderTop: '1px solid #e5e7eb', paddingTop: '20px' }}>
+            <div style={{ ...styles.group, borderTop: '1px solid var(--border)', paddingTop: '20px' }}>
               <label style={styles.label}>快速操作</label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <button
@@ -371,8 +373,8 @@ const DesignEditor = ({ selectedElement, onStyleChange, onClose }) => {
                   }}
                   style={{
                     padding: '10px',
-                    backgroundColor: '#f3f4f6',
-                    border: '1px solid #d1d5db',
+                    backgroundColor: 'var(--paper)',
+                    border: '1px solid var(--border)',
                     borderRadius: '6px',
                     cursor: 'pointer',
                     fontSize: '13px'
@@ -388,11 +390,11 @@ const DesignEditor = ({ selectedElement, onStyleChange, onClose }) => {
                   style={{
                     padding: '10px',
                     backgroundColor: '#eff6ff',
-                    border: '1px solid #3b82f6',
+                    border: '1px solid var(--accent)',
                     borderRadius: '6px',
                     cursor: 'pointer',
                     fontSize: '13px',
-                    color: '#1e40af'
+                    color: 'var(--accent-dark)'
                   }}
                 >
                   📋 複製樣式代碼
@@ -404,9 +406,9 @@ const DesignEditor = ({ selectedElement, onStyleChange, onClose }) => {
       )}
 
       {!selectedElement && (
-        <div style={{ ...styles.content, textAlign: 'center', color: '#9ca3af', padding: '40px 20px' }}>
+        <div style={{ ...styles.content, textAlign: 'center', color: 'var(--muted-2)', padding: '40px 20px' }}>
           <div style={{ fontSize: '48px', marginBottom: '20px' }}>👆</div>
-          <h4 style={{ fontSize: '16px', fontWeight: '600', color: '#374151', marginBottom: '10px' }}>
+          <h4 style={{ fontSize: '16px', fontWeight: '600', color: 'var(--ink)', marginBottom: '10px' }}>
             設計模式已啟用
           </h4>
           <p style={{ fontSize: '14px', lineHeight: '1.6', margin: '0 0 15px 0' }}>
@@ -419,7 +421,7 @@ const DesignEditor = ({ selectedElement, onStyleChange, onClose }) => {
             border: '1px solid #bfdbfe',
             textAlign: 'left',
             fontSize: '13px',
-            color: '#1e40af'
+            color: 'var(--accent-dark)'
           }}>
             <div style={{ fontWeight: '600', marginBottom: '8px' }}>💡 提示:</div>
             <ul style={{ margin: 0, paddingLeft: '20px', lineHeight: '1.8' }}>

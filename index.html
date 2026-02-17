@@ -3,11 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <title>單字閃卡 - 日文學習</title>
+    <title>單字閃卡 - 日文學習 [LIVE]</title>
 
     <!-- PWA Meta Tags -->
     <meta name="description" content="日文單字學習閃卡應用程式，支援 Anki 匯入和 Azure TTS 語音播放" />
-    <meta name="theme-color" content="#4F46E5" />
+    <meta name="theme-color" content="#8b6a4a" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="單字閃卡" />
@@ -22,6 +22,14 @@
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="/icon-192.png" />
 
+    <!-- Wabi-Sabi Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;600&family=Zen+Kaku+Gothic+New:wght@300;400;500;700&display=swap"
+      rel="stylesheet"
+    />
+
     <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- Responsive CSS -->
@@ -32,9 +40,44 @@
         -webkit-touch-callout: none;
       }
 
+      :root {
+        --bg: #f8fafc;
+        --paper: #ffffff;
+        --ink: #0f172a;
+        --muted: #475569;
+        --muted-2: #94a3b8;
+        --border: #e2e8f0;
+        --accent: #334155;
+        --accent-dark: #0f172a;
+        --accent-light: #cbd5e1;
+        --success: #166534;
+        --success-dark: #14532d;
+        --danger: #b91c1c;
+        --danger-dark: #991b1b;
+        --danger-bg: #fef2f2;
+      }
+
       body {
         overscroll-behavior: none;
         -webkit-overflow-scrolling: touch;
+        font-family: "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Kaku Gothic ProN", system-ui, sans-serif;
+        color: var(--ink);
+        background-color: var(--bg);
+      }
+
+      h1, h2, h3, h4, h5 {
+        font-family: "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Kaku Gothic ProN", system-ui, sans-serif;
+        letter-spacing: 0;
+      }
+
+      button {
+        font-family: "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Kaku Gothic ProN", system-ui, sans-serif;
+      }
+
+      input, select, textarea {
+        background-color: var(--paper);
+        color: var(--ink);
+        border-color: var(--border);
       }
 
       /* 同步狀態旋轉動畫 */
@@ -73,8 +116,25 @@
 
     <!-- Service Worker 註冊 -->
     <script>
+      const isLocalDev =
+        location.hostname === 'localhost' ||
+        location.hostname === '127.0.0.1' ||
+        location.hostname.endsWith('.local');
+
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
+        window.addEventListener('load', async () => {
+          if (isLocalDev) {
+            // 開發環境避免 SW 快取造成舊版畫面殘留
+            const regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map((r) => r.unregister()));
+            if (window.caches) {
+              const keys = await caches.keys();
+              await Promise.all(keys.map((k) => caches.delete(k)));
+            }
+            console.log('🧹 開發模式：已清除 Service Worker 與快取');
+            return;
+          }
+
           navigator.serviceWorker.register('/service-worker.js')
             .then((registration) => {
               console.log('✅ Service Worker 註冊成功:', registration.scope);

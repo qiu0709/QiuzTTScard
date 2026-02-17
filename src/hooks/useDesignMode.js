@@ -43,7 +43,7 @@ export const useDesignMode = (designMode, selectedElement, setSelectedElement, c
           ...(customStyles[elementId] || {}),
           position: 'relative',
           cursor: 'pointer',
-          outline: isSelected ? '3px solid #4F46E5' : '1px dashed rgba(79, 70, 229, 0.3)',
+          outline: isSelected ? '3px solid var(--accent)' : '1px dashed rgba(79, 70, 229, 0.3)',
           outlineOffset: '2px',
           transition: 'outline 0.2s'
         }
@@ -66,7 +66,7 @@ export const useDesignMode = (designMode, selectedElement, setSelectedElement, c
       ...baseStyle,
       ...(customStyles[elementId] || {}),
       position: 'relative',
-      outline: isSelected ? '3px solid #4F46E5' : '1px dashed rgba(79, 70, 229, 0.3)',
+      outline: isSelected ? '3px solid var(--accent)' : '1px dashed rgba(79, 70, 229, 0.3)',
       outlineOffset: '2px',
       transition: 'outline 0.2s',
       cursor: 'pointer'
@@ -91,7 +91,7 @@ export const useDesignMode = (designMode, selectedElement, setSelectedElement, c
   const applyTheme = useCallback((themeName) => {
     const themes = {
       default: {
-        primaryColor: '#4F46E5',
+        primaryColor: 'var(--accent)',
         buttonRadius: '8px',
         fontSize: '14px'
       },
@@ -101,7 +101,7 @@ export const useDesignMode = (designMode, selectedElement, setSelectedElement, c
         fontSize: '14px'
       },
       green: {
-        primaryColor: '#10b981',
+        primaryColor: 'var(--success)',
         buttonRadius: '6px',
         fontSize: '13px'
       }

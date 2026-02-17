@@ -1,0 +1,347 @@
+========================================
+單字閃卡 App - 完整開發指令
+========================================
+
+請幫我開發一個日文單字閃卡學習 App，以下是完整的功能需求：
+
+========================================
+技術棧
+========================================
+- React 18 + Vite
+- Tailwind CSS
+- Lucide React 圖標庫
+- PWA（支援離線使用和安裝）
+
+========================================
+核心功能
+========================================
+
+【功能 1：資料夾和卡片管理】
+- 建立/刪除/重命名資料夾，支援子資料夾分組
+- 資料夾圖示自訂和拖曳排序
+- 卡片顯示模式：卡片模式和表格模式切換
+- 自訂欄位系統：
+  * 預設欄位：漢字、ひらがな、意味、例文、レベル
+  * 支援新增/刪除/編輯自訂欄位
+  * 欄位類型：kanji（漢字+注音）、text（純文字）
+  * 欄位拖曳排序
+- 漢字注音顯示格式：食べる[たべる]，使用 HTML ruby 標籤顯示
+
+【功能 2：APKG（Anki 卡包）匯入功能】
+- 支援 .apkg 檔案上傳
+- 使用 jszip 解壓縮
+- 使用 sql.js 解析 collection.anki21/anki2 資料庫
+- 自動提取音檔（mp3, wav, ogg, m4a 等）並轉換為 base64
+- 清理 HTML 標籤保留純文字
+- 智能欄位識別（漢字、假名、例句等）
+- 匯入模式：建立新資料夾或附加到現有資料夾
+- 在學習模式中播放 APKG 音檔
+
+【功能 3：Azure TTS 語音播放系統】
+需要整合 microsoft-cognitiveservices-speech-sdk
+
+語音選項：
+- 日語 7 種：
+  * ja-JP-NanamiNeural（女性，標準）
+  * ja-JP-KeitaNeural（男性，標準）
+  * ja-JP-AoiNeural（女性，活潑）
+  * ja-JP-DaichiNeural（男性，穩重）
+  * ja-JP-MayuNeural（女性，溫柔）
+  * ja-JP-NaokiNeural（男性，成熟）
+  * ja-JP-ShioriNeural（女性，優雅）
+
+- 中文 4 種：
+  * zh-TW-HsiaoChenNeural（曉臻，女性）
+  * zh-TW-YunJheNeural（雲哲，男性）
+  * zh-TW-HsiaoYuNeural（曉宇，女性）
+  * zh-TW-YunHsiNeural（雲曦，男性）
+
+- 英文 8 種：
+  * en-US-JennyNeural（女性，助理）
+  * en-US-GuyNeural（男性，新聞）
+  * en-US-AriaNeural（女性，客服）
+  * en-US-DavisNeural（男性，對話）
+  * en-US-AmberNeural（女性，溫暖）
+  * en-US-AnaNeural（女性，年輕）
+  * en-US-AndrewNeural（男性，新聞）
+  * en-US-EmmaNeural（女性，多語）
+
+語音控制：
+- 播放速度：0.5x - 4.0x
+- 音調調整：-50 到 +50
+- 情感風格：neutral, cheerful, gentle, calm, sad, angry, serious 等
+
+欄位獨立設定：
+每個自訂欄位可以設定不同的語音、速度、音調、風格
+
+【功能 4：自動播放腳本系統】
+腳本步驟類型：
+- display：切換顯示模板
+- speak：播放語音（可設定重複次數、速度、暫停時間）
+- pause：暫停（秒數）
+
+頁面模板系統：
+- 預設 5 個模板（A-E）：
+  * A：純漢字（漢字+意味）
+  * B：漢字+注音（漢字+ひらがな）
+  * C：例句
+  * D：詳細信息（漢字+意味+レベル）
+  * E：完整顯示（全部欄位）
+
+自訂模板功能：
+- 選擇顯示欄位
+- 調整樣式（字體大小/字型/對齊/顏色/行間距）
+- 頁首欄位設定（最多 3 個）
+- 腳本步驟拖曳排序
+- 測試播放功能
+
+【功能 5：照片錄音卡片功能】
+- 📷 上傳照片（限制 5MB）
+- 🎤 錄音功能（使用瀏覽器 MediaRecorder API）
+- ▶ 播放錄音（支援 0.5x - 4.0x 播放速度）
+- 📝 文字註解
+- 錄音計時顯示和播放進度條
+
+【功能 6：GitHub Gist 雲端同步】
+- GitHub Personal Access Token 設定
+- Gist ID 設定
+- 自動同步開關（資料變更時自動上傳）
+- 手動上傳/下載按鈕
+- 建立新 Gist 功能
+- 查看 Gist 內容連結
+- 同步狀態顯示（右上角圖示：idle, syncing, success, error）
+- 最後同步時間記錄
+- 同步所有資料夾、卡片、自訂欄位、設定和模板
+
+【功能 7：資料匯入/匯出功能】
+匯入：
+- Google 試算表匯入（CSV 格式）
+- APKG 檔案匯入
+- JSON 匯入
+
+匯出：
+- 匯出為 JSON
+- 匯出為 CSV
+- 匯出為 APKG（Anki 格式）
+
+【功能 8：試算表編輯器】
+- 表格式編輯卡片
+- 批量新增/刪除卡片
+- 欄位順序調整
+- CSV 資料貼上
+
+【功能 9：設計模式】
+- 視覺化樣式編輯
+- 元素選擇和調整
+- 預設主題套用
+- 自訂樣式儲存
+
+========================================
+資料存儲結構（LocalStorage）
+========================================
+
+【folders】
+[{
+  "id": "string",
+  "name": "string",
+  "icon": "string",
+  "cards": [{
+    "id": "string",
+    "fields": { "fieldKey": "string" },
+    "audioFields": {
+      "fieldKey": {
+        "fileName": "string",
+        "dataUrl": "string",
+        "mimeType": "string"
+      }
+    }
+  }],
+  "customFields": {
+    "fieldKey": {
+      "label": "string",
+      "type": "kanji | text",
+      "order": "number"
+    }
+  }
+}]
+
+【app-settings】
+{
+  "defaultRate": 1.0,
+  "showFurigana": true,
+  "azureTTS": {
+    "enabled": true,
+    "subscriptionKey": "string",
+    "region": "string",
+    "defaultVoice": "string"
+  }
+}
+
+【sync-settings】
+{
+  "githubToken": "string",
+  "gistId": "string",
+  "autoSync": false,
+  "lastSyncTime": "ISO string"
+}
+
+【其他存儲】
+- fieldVoiceSettings：欄位語音設定
+- displayTemplates：顯示模板
+- autoPlayScript：自動播放腳本
+- customStyles：自訂樣式
+
+========================================
+PWA 設定
+========================================
+
+【manifest.json】
+- 應用程式名稱：單字閃卡 - 日文學習
+- 主題色：#4F46E5
+- 顯示模式：standalone
+- 圖標：192x192, 512x512
+
+【Service Worker】
+- Cache First 策略
+- 離線支援
+- 自動清理舊快取
+
+========================================
+響應式設計要求
+========================================
+- 手機版按鈕最小尺寸：44px x 44px
+- 字體大小：16px（防止 iOS 自動縮放）
+- 觸控手勢優化
+- iOS 安全區域適配
+- 防止雙擊縮放
+
+========================================
+部署配置（Netlify）
+========================================
+- 構建命令：npm run build
+- 發布目錄：dist
+- Node 版本：18
+- 需要 SPA 重導向配置
+
+========================================
+套件依賴
+========================================
+{
+  "react": "^18.2.0",
+  "react-dom": "^18.2.0",
+  "vite": "^4.4.5",
+  "microsoft-cognitiveservices-speech-sdk": "latest",
+  "jszip": "latest",
+  "sql.js": "latest",
+  "lucide-react": "latest",
+  "tailwindcss": "latest"
+}
+
+========================================
+UI/UX 要求
+========================================
+- 使用 Tailwind CSS 設計現代化介面
+- 藍紫色主題（#4F46E5）
+- 使用 Lucide React 圖標
+- 支援深色模式（可選）
+- 流暢的動畫效果
+- 直觀的拖曳操作
+- 清晰的狀態提示
+
+========================================
+開發建議
+========================================
+
+分階段開發順序：
+
+第一階段：基礎架構
+- 設定 React + Vite 專案
+- 配置 Tailwind CSS
+- 建立基本的資料夾和卡片管理系統
+
+第二階段：核心功能
+- 自訂欄位系統
+- 卡片編輯和顯示
+- LocalStorage 資料存儲
+
+第三階段：進階功能
+- APKG 匯入功能
+- Azure TTS 語音系統
+- 自動播放腳本
+
+第四階段：擴展功能
+- 照片錄音卡片
+- GitHub Gist 同步
+- 資料匯入/匯出
+
+第五階段：優化
+- PWA 配置
+- 響應式設計優化
+- 效能優化
+
+========================================
+重要技術細節
+========================================
+
+【APKG 匯入處理流程】
+1. 解壓 .apkg 檔案（ZIP 格式）
+2. 讀取 collection.anki21 資料庫（SQLite）
+3. 解析 media 映射表（JSON）
+4. 提取音檔並轉換為 base64
+5. 儲存音檔數據到 audioFields
+6. 在學習模式中播放音檔
+
+支援格式：mp3, wav, ogg, m4a, webm, aac, flac
+
+【漢字注音顯示】
+格式：漢字[ふりがな]
+範例：食べる[たべる]
+
+處理邏輯：
+- 自動解析並分離漢字和注音
+- 支援多個注音標記
+- 使用 HTML <ruby> 和 <rt> 標籤顯示
+
+【Azure TTS 整合】
+1. 初始化 SpeechConfig
+2. 設定語音、速度、音調
+3. 使用 SSML 標記控制語音風格
+4. 非同步播放音訊
+5. 錯誤處理和狀態管理
+
+【GitHub Gist 同步】
+1. 使用 GitHub REST API
+2. Bearer token 認證
+3. JSON 格式儲存完整資料
+4. 自動同步使用 debounce 防抖
+5. 錯誤處理和重試機制
+
+========================================
+參考資源
+========================================
+
+Azure Cognitive Services TTS：
+https://learn.microsoft.com/azure/cognitive-services/speech-service/
+
+GitHub Gist API：
+https://docs.github.com/rest/gists
+
+Anki APKG 格式：
+https://github.com/ankitects/anki
+
+sql.js 文件：
+https://github.com/sql-js/sql.js
+
+JSZip 文件：
+https://stuk.github.io/jszip/
+
+========================================
+結語
+========================================
+
+請按照以上需求開發一個完整的 React + Vite 單字閃卡學習應用程式。
+這是一個功能豐富的專業級學習工具，請確保每個功能都經過測試且使用者體驗流暢。
+
+如有任何疑問或需要澄清的地方，請隨時詢問。
+
+開發愉快！

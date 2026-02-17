@@ -158,6 +158,7 @@ const FullFlashcardApp = () => {
   ];
 
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
+  const isAutoPlayingRef = useRef(false);
   const [autoPlayMode, setAutoPlayMode] = useState('sequential'); // 'sequential' | 'loop'
   const [currentAutoPlayCard, setCurrentAutoPlayCard] = useState(0);
   const [currentAutoPlayStep, setCurrentAutoPlayStep] = useState(0);
@@ -532,103 +533,102 @@ const FullFlashcardApp = () => {
   const styles = {
     container: {
       minHeight: '100vh',
-      backgroundColor: '#fafafa',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-      color: '#333333',
-      padding: isMobile ? '10px' : '20px'
+      backgroundColor: 'var(--bg)',
+      fontFamily: '"Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Kaku Gothic ProN", system-ui, sans-serif',
+      color: 'var(--ink)',
+      padding: isMobile ? '12px' : '20px'
     },
     header: {
-      fontSize: isMobile ? '20px' : '28px',
-      fontWeight: '600',
-      color: '#1a1a1a',
-      marginBottom: isMobile ? '16px' : '24px',
+      fontSize: isMobile ? '20px' : '26px',
+      fontWeight: '700',
+      color: 'var(--ink)',
+      marginBottom: isMobile ? '16px' : '22px',
       display: 'flex',
       alignItems: 'center',
       gap: isMobile ? '8px' : '12px',
-      letterSpacing: '-0.5px'
+      letterSpacing: 0
     },
     button: {
-      backgroundColor: '#4F46E5',
+      backgroundColor: 'var(--accent)',
       color: 'white',
-      border: 'none',
+      border: '1px solid var(--accent)',
       padding: isMobile ? '12px 16px' : '10px 20px',
-      borderRadius: '12px',
+      borderRadius: '10px',
       cursor: 'pointer',
       fontSize: isMobile ? '16px' : '14px',
-      fontWeight: '500',
-      boxShadow: '0 2px 8px rgba(79, 70, 229, 0.2)',
-      transition: 'all 0.2s ease',
+      fontWeight: '600',
+      boxShadow: 'none',
+      transition: 'background-color 0.2s ease, border-color 0.2s ease',
       minHeight: isMobile ? '48px' : 'auto',
       touchAction: 'manipulation',
       '&:hover': {
-        backgroundColor: '#4338CA',
-        transform: 'translateY(-1px)',
-        boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)'
+        backgroundColor: 'var(--accent-dark)',
+        borderColor: 'var(--accent-dark)'
       }
     },
     buttonGreen: {
-      backgroundColor: '#10B981',
+      backgroundColor: 'var(--success)',
       color: 'white',
-      border: 'none',
+      border: '1px solid var(--success)',
       padding: isMobile ? '12px 16px' : '10px 20px',
-      borderRadius: '12px',
+      borderRadius: '10px',
       cursor: 'pointer',
       fontSize: isMobile ? '16px' : '14px',
-      fontWeight: '500',
-      boxShadow: '0 2px 8px rgba(16, 185, 129, 0.2)',
-      transition: 'all 0.2s ease',
+      fontWeight: '600',
+      boxShadow: 'none',
+      transition: 'background-color 0.2s ease, border-color 0.2s ease',
       minHeight: isMobile ? '48px' : 'auto',
       touchAction: 'manipulation'
     },
     buttonRed: {
-      backgroundColor: '#EF4444',
+      backgroundColor: 'var(--danger)',
       color: 'white',
-      border: 'none',
+      border: '1px solid var(--danger)',
       padding: isMobile ? '12px 16px' : '10px 20px',
-      borderRadius: '12px',
+      borderRadius: '10px',
       cursor: 'pointer',
       fontSize: isMobile ? '16px' : '14px',
-      fontWeight: '500',
-      boxShadow: '0 2px 8px rgba(239, 68, 68, 0.2)',
-      transition: 'all 0.2s ease',
+      fontWeight: '600',
+      boxShadow: 'none',
+      transition: 'background-color 0.2s ease, border-color 0.2s ease',
       minHeight: isMobile ? '48px' : 'auto',
       touchAction: 'manipulation'
     },
     buttonGray: {
-      backgroundColor: '#6B7280',
+      backgroundColor: 'var(--muted)',
       color: 'white',
-      border: 'none',
+      border: '1px solid var(--muted)',
       padding: isMobile ? '12px 16px' : '10px 20px',
-      borderRadius: '12px',
+      borderRadius: '10px',
       cursor: 'pointer',
       fontSize: isMobile ? '16px' : '14px',
-      fontWeight: '500',
-      boxShadow: '0 2px 8px rgba(107, 114, 128, 0.2)',
-      transition: 'all 0.2s ease',
+      fontWeight: '600',
+      boxShadow: 'none',
+      transition: 'background-color 0.2s ease, border-color 0.2s ease',
       minHeight: isMobile ? '48px' : 'auto',
       touchAction: 'manipulation'
     },
     card: {
-      backgroundColor: 'white',
-      borderRadius: '16px',
-      boxShadow: '0 2px 16px rgba(0, 0, 0, 0.08)',
-      padding: '24px',
-      marginBottom: '20px',
-      border: '1px solid #f0f0f0',
-      transition: 'all 0.2s ease'
+      backgroundColor: 'var(--paper)',
+      borderRadius: '12px',
+      boxShadow: 'none',
+      padding: '20px',
+      marginBottom: '16px',
+      border: '1px solid var(--border)',
+      transition: 'border-color 0.2s ease'
     },
     input: {
-      border: '1px solid #e5e7eb',
+      border: '1px solid var(--border)',
       borderRadius: '12px',
       padding: '12px 16px',
       fontSize: '14px',
       width: '100%',
-      backgroundColor: 'white',
+      backgroundColor: 'var(--paper)',
       transition: 'all 0.2s ease',
       '&:focus': {
         outline: 'none',
-        borderColor: '#4F46E5',
-        boxShadow: '0 0 0 3px rgba(79, 70, 229, 0.1)'
+        borderColor: 'var(--accent)',
+        boxShadow: '0 0 0 3px rgba(139, 106, 74, 0.18)'
       }
     },
     grid: {
@@ -653,20 +653,20 @@ const FullFlashcardApp = () => {
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.4)',
+      backgroundColor: 'rgba(15, 23, 42, 0.25)',
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
       zIndex: 50,
-      backdropFilter: 'blur(4px)'
+      backdropFilter: 'blur(2px)'
     },
     modalContent: {
-      backgroundColor: 'white',
-      borderRadius: isMobile ? '12px' : '20px',
+      backgroundColor: 'var(--paper)',
+      borderRadius: isMobile ? '12px' : '14px',
       padding: isMobile ? '16px' : '32px',
       maxWidth: isMobile ? '95vw' : '900px',
       width: '95%',
-      boxShadow: '0 20px 60px rgba(0, 0, 0, 0.15)',
+      boxShadow: '0 12px 24px rgba(15, 23, 42, 0.1)',
       maxHeight: isMobile ? '85vh' : '90vh',
       overflow: 'auto'
     }
@@ -1116,14 +1116,31 @@ ${cleanText}
     playbackControlRef.current.shouldContinue = true;
     setIsPlaying(true);
     const page = card.pages[pageIndex];
+    const scriptSteps = Array.isArray(page.script) ? page.script : [];
 
     try {
+      if (scriptSteps.length === 0) {
+        console.warn('腳本為空，改為播放第一個有內容的欄位');
+        const fallbackFieldKey = Object.keys(card.fields || {}).find((key) => {
+          const value = card.fields?.[key];
+          return typeof value === 'string' && value.trim();
+        });
+
+        if (fallbackFieldKey) {
+          await speak(card.fields[fallbackFieldKey], {
+            rate: settings.defaultRate,
+            fieldKey: fallbackFieldKey
+          });
+        }
+        return;
+      }
+
       let lastAudioDuration = 0; // 記錄上一個音檔的長度
       let lastTextLength = 0; // 記錄上一個文本的長度
 
-      for (let i = 0; i < page.script.length && playbackControlRef.current.shouldContinue; i++) {
-        const step = page.script[i];
-        console.log(`執行步驟 ${i + 1}/${page.script.length}:`, step);
+      for (let i = 0; i < scriptSteps.length && playbackControlRef.current.shouldContinue; i++) {
+        const step = scriptSteps[i];
+        console.log(`執行步驟 ${i + 1}/${scriptSteps.length}:`, step);
 
         switch (step.type) {
           case 'display':
@@ -1811,7 +1828,7 @@ ${cleanText}
     return (
       <div style={styles.modal}>
         <div style={{ ...styles.modalContent, maxWidth: isMobile ? '95vw' : '600px' }}>
-          <h2 style={{ margin: '0 0 20px 0', color: '#1f2937', fontSize: isMobile ? '18px' : '24px' }}>☁️ 雲端同步設定</h2>
+          <h2 style={{ margin: '0 0 20px 0', color: 'var(--ink)', fontSize: isMobile ? '18px' : '24px' }}>☁️ 雲端同步設定</h2>
 
           <div style={{ marginBottom: '20px' }}>
             <h3 style={{ fontSize: isMobile ? '14px' : '16px', marginBottom: '10px' }}>📦 匯出/匯入資料</h3>
@@ -1831,7 +1848,7 @@ ${cleanText}
             </div>
           </div>
 
-          <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '20px', marginTop: '20px' }}>
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '20px', marginTop: '20px' }}>
             <h3 style={{ fontSize: isMobile ? '14px' : '16px', marginBottom: '10px' }}>☁️ GitHub Gist 同步</h3>
 
             <div style={{ marginBottom: '15px' }}>
@@ -1845,9 +1862,9 @@ ${cleanText}
                 style={{ ...styles.input, width: '100%', fontSize: isMobile ? '16px' : '14px' }}
                 placeholder="ghp_xxxxxxxxxxxx"
               />
-              <p style={{ fontSize: isMobile ? '11px' : '12px', color: '#6b7280', margin: '5px 0 0 0' }}>
+              <p style={{ fontSize: isMobile ? '11px' : '12px', color: 'var(--muted)', margin: '5px 0 0 0' }}>
                 需要 'gist' 權限。
-                <a href="https://github.com/settings/tokens/new" target="_blank" rel="noopener noreferrer" style={{ color: '#4F46E5' }}>
+                <a href="https://github.com/settings/tokens/new" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>
                   建立 Token
                 </a>
               </p>
@@ -1870,12 +1887,12 @@ ${cleanText}
                 </button>
               </div>
               {localSyncSettings.gistId && (
-                <p style={{ fontSize: isMobile ? '11px' : '12px', color: '#6b7280', margin: '5px 0 0 0' }}>
+                <p style={{ fontSize: isMobile ? '11px' : '12px', color: 'var(--muted)', margin: '5px 0 0 0' }}>
                   🔗 <a
                     href={`https://gist.github.com/${localSyncSettings.gistId}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ color: '#4F46E5', textDecoration: 'underline' }}
+                    style={{ color: 'var(--accent)', textDecoration: 'underline' }}
                   >
                     查看您的 Gist 內容
                   </a>
@@ -1899,13 +1916,13 @@ ${cleanText}
               padding: '12px',
               borderRadius: '8px',
               backgroundColor: localSyncSettings.githubToken && localSyncSettings.gistId ? '#ECFDF5' : '#FEF3C7',
-              border: `1px solid ${localSyncSettings.githubToken && localSyncSettings.gistId ? '#10B981' : '#F59E0B'}`,
+              border: `1px solid ${localSyncSettings.githubToken && localSyncSettings.gistId ? 'var(--success)' : '#F59E0B'}`,
               marginBottom: '15px'
             }}>
-              <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '6px', color: '#1f2937' }}>
+              <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '6px', color: 'var(--ink)' }}>
                 {localSyncSettings.githubToken && localSyncSettings.gistId ? '✅ 同步已設定' : '⚠️ 同步未設定'}
               </div>
-              <div style={{ fontSize: '12px', color: '#6b7280' }}>
+              <div style={{ fontSize: '12px', color: 'var(--muted)' }}>
                 {localSyncSettings.githubToken && localSyncSettings.gistId ? (
                   <>
                     <div>• 自動同步: {localSyncSettings.autoSync ? '✓ 已啟用' : '✗ 未啟用'}</div>
@@ -2173,7 +2190,7 @@ ${cleanText}
                 borderRadius: '4px',
                 fontSize: '13px',
                 backgroundColor: azureSettings.enabled && azureSettings.subscriptionKey ? '#dcfce7' : '#fef3c7',
-                color: azureSettings.enabled && azureSettings.subscriptionKey ? '#166534' : '#92400e',
+                color: azureSettings.enabled && azureSettings.subscriptionKey ? '#166534' : 'var(--accent-dark)',
                 border: `1px solid ${azureSettings.enabled && azureSettings.subscriptionKey ? '#bbf7d0' : '#fde68a'}`
               }}>
                 <span style={{ fontSize: '12px' }}>
@@ -2186,7 +2203,7 @@ ${cleanText}
               <button 
                 style={{ 
                   ...styles.button, 
-                  backgroundColor: isTesting ? '#9ca3af' : '#059669',
+                  backgroundColor: isTesting ? 'var(--muted-2)' : 'var(--success)',
                   cursor: isTesting ? 'not-allowed' : 'pointer'
                 }} 
                 onClick={testAzureConnection}
@@ -2200,7 +2217,7 @@ ${cleanText}
           </div>
 
           {/* 啟用Azure TTS */}
-          <div style={{ margin: '20px 0', padding: '15px', backgroundColor: '#f3f4f6', borderRadius: '6px' }}>
+          <div style={{ margin: '20px 0', padding: '15px', backgroundColor: 'var(--paper)', borderRadius: '6px' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '16px', fontWeight: 'bold' }}>
               <input
                 type="checkbox"
@@ -2209,7 +2226,7 @@ ${cleanText}
               />
               啟用 Azure Text-to-Speech
             </label>
-            <p style={{ fontSize: '14px', color: '#6b7280', margin: '10px 0 0 30px' }}>
+            <p style={{ fontSize: '14px', color: 'var(--muted)', margin: '10px 0 0 30px' }}>
               啟用後將使用更高品質的 Azure TTS 語音，否則使用瀏覽器內建 TTS
             </p>
           </div>
@@ -2217,7 +2234,7 @@ ${cleanText}
           {azureSettings.enabled && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               {/* API 設定 */}
-              <div style={{ padding: '15px', border: '1px solid #d1d5db', borderRadius: '6px' }}>
+              <div style={{ padding: '15px', border: '1px solid var(--border)', borderRadius: '6px' }}>
                 <h4 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '15px' }}>🔑 API 設定</h4>
                 <div style={{ display: 'grid', gap: '15px' }}>
                   <div>
@@ -2257,7 +2274,7 @@ ${cleanText}
               </div>
 
               {/* 語音測試 */}
-              <div style={{ padding: '15px', border: '1px solid #d1d5db', borderRadius: '6px' }}>
+              <div style={{ padding: '15px', border: '1px solid var(--border)', borderRadius: '6px' }}>
                 <h4 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '15px' }}>🎤 語音測試</h4>
                 <div style={{ display: 'grid', gap: '15px' }}>
                   <div>
@@ -2297,7 +2314,7 @@ ${cleanText}
                     disabled={isTesting}
                     style={{ 
                       ...styles.buttonGreen, 
-                      backgroundColor: isTesting ? '#9ca3af' : '#16a34a'
+                      backgroundColor: isTesting ? 'var(--muted-2)' : '#16a34a'
                     }}
                   >
 {isTesting ? '◐ 測試中...' : '♪ 測試語音'}
@@ -2306,14 +2323,14 @@ ${cleanText}
               </div>
 
               {/* 音檔快取管理 */}
-              <div style={{ padding: '15px', border: '1px solid #d1d5db', borderRadius: '6px' }}>
+              <div style={{ padding: '15px', border: '1px solid var(--border)', borderRadius: '6px' }}>
                 <h4 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '15px' }}>▣ 音檔快取管理</h4>
                 <div style={{ display: 'grid', gap: '15px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', backgroundColor: '#f9fafb', borderRadius: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', backgroundColor: 'var(--paper)', borderRadius: '6px' }}>
                     <span style={{ fontSize: '14px' }}>
                       <strong>快取大小：</strong>{cacheSizeMB} MB
                     </span>
-                    <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                    <span style={{ fontSize: '12px', color: 'var(--muted)' }}>
                       自動過期：30天
                     </span>
                   </div>
@@ -2333,7 +2350,7 @@ ${cleanText}
                   </div>
                 </div>
                 <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#f0f9ff', borderRadius: '6px' }}>
-                  <p style={{ fontSize: '12px', color: '#0369a1', margin: 0 }}>
+                  <p style={{ fontSize: '12px', color: 'var(--accent-dark)', margin: 0 }}>
                     <strong>💡 快取說明：</strong><br />
                     • 首次播放會調用 Azure API 並儲存音檔<br />
                     • 相同文字+語音+風格的組合會使用快取，節省API費用<br />
@@ -2347,7 +2364,7 @@ ${cleanText}
 
           {/* 說明區域 */}
           <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f0f9ff', borderRadius: '6px' }}>
-            <p style={{ fontSize: '14px', color: '#0369a1', margin: 0 }}>
+            <p style={{ fontSize: '14px', color: 'var(--accent-dark)', margin: 0 }}>
               <strong>📋 Azure Speech Services 設定說明：</strong><br />
               1. 前往 <strong>Azure Portal (portal.azure.com)</strong><br />
               2. 創建 <strong>Speech Services</strong> 資源（不是 Cognitive Services 多合一資源）<br />
@@ -2362,7 +2379,7 @@ ${cleanText}
 
           {/* 故障排除 */}
           <div style={{ marginTop: '15px', padding: '15px', backgroundColor: '#fef2f2', borderRadius: '6px' }}>
-            <p style={{ fontSize: '14px', color: '#dc2626', margin: 0 }}>
+            <p style={{ fontSize: '14px', color: 'var(--danger)', margin: 0 }}>
               <strong>⚠ 常見問題排除：</strong><br />
               • <strong>401 錯誤</strong>：訂閱金鑰錯誤或過期<br />
               • <strong>403 錯誤</strong>：區域設定錯誤或該區域未啟用服務<br />
@@ -2498,7 +2515,7 @@ ${cleanText}
                   padding: '4px 8px',
                   fontSize: '12px',
                   backgroundColor: settings.azureTTS.enabled && settings.azureTTS.subscriptionKey ? '#dcfce7' : '#fef3c7',
-                  color: settings.azureTTS.enabled && settings.azureTTS.subscriptionKey ? '#166534' : '#92400e',
+                  color: settings.azureTTS.enabled && settings.azureTTS.subscriptionKey ? '#166534' : 'var(--accent-dark)',
                   border: `1px solid ${settings.azureTTS.enabled && settings.azureTTS.subscriptionKey ? '#bbf7d0' : '#fde68a'}`,
                   borderRadius: '4px',
                   cursor: 'pointer',
@@ -2521,7 +2538,7 @@ ${cleanText}
           </div>
 
           {/* 添加新欄位 */}
-          <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f3f4f6', borderRadius: '6px' }}>
+          <div style={{ marginTop: '20px', padding: '15px', backgroundColor: 'var(--paper)', borderRadius: '6px' }}>
             <h4 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '10px' }}>添加新欄位</h4>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px 80px', gap: '10px', alignItems: 'end' }}>
               <input
@@ -2553,7 +2570,7 @@ ${cleanText}
           {/* 現有欄位列表 */}
           <div style={{ marginTop: '20px' }}>
             <h4 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '10px' }}>現有欄位設定</h4>
-            <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '10px' }}>💡 提示：拖曳左側手柄可調整欄位順序，最上面的為第一欄</p>
+            <p style={{ fontSize: '14px', color: 'var(--muted)', marginBottom: '10px' }}>💡 提示：拖曳左側手柄可調整欄位順序，最上面的為第一欄</p>
             <div style={{ maxHeight: '500px', overflow: 'auto' }}>
               {Object.entries(editingFields)
                 .sort(([,a], [,b]) => (a.order || 0) - (b.order || 0))
@@ -2573,7 +2590,7 @@ ${cleanText}
                       onDrop={(e) => handleDrop(e, key)}
                       style={{
                         padding: '12px',
-                        border: `2px solid ${dragOverItem === key ? '#3b82f6' : '#e5e7eb'}`,
+                        border: `2px solid ${dragOverItem === key ? 'var(--accent)' : 'var(--border)'}`,
                         borderRadius: '8px',
                         marginBottom: '12px',
                         backgroundColor: draggedItem === key ? '#f1f5f9' : 'white',
@@ -2598,7 +2615,7 @@ ${cleanText}
                         }}>
                           {/* 拖曳手柄 */}
                           <div style={{
-                            color: '#9ca3af',
+                            color: 'var(--muted-2)',
                             cursor: 'grab',
                             textAlign: 'center',
                             fontSize: '16px',
@@ -2614,7 +2631,7 @@ ${cleanText}
                           <div style={{
                             fontSize: '10px',
                             fontWeight: '600',
-                            color: '#4F46E5',
+                            color: 'var(--accent)',
                             textAlign: 'center',
                             backgroundColor: '#eef2ff',
                             padding: '3px',
@@ -2641,9 +2658,9 @@ ${cleanText}
                                 padding: '5px 3px',
                                 fontSize: '10px',
                                 borderRadius: '4px',
-                                border: field.type === 'text' ? '2px solid #4F46E5' : '1px solid #d1d5db',
-                                backgroundColor: field.type === 'text' ? '#4F46E5' : 'white',
-                                color: field.type === 'text' ? 'white' : '#6b7280',
+                                border: field.type === 'text' ? '2px solid var(--accent)' : '1px solid var(--border)',
+                                backgroundColor: field.type === 'text' ? 'var(--accent)' : 'white',
+                                color: field.type === 'text' ? 'white' : 'var(--muted)',
                                 cursor: 'pointer',
                                 fontWeight: field.type === 'text' ? '600' : '400',
                                 transition: 'all 0.2s'
@@ -2658,9 +2675,9 @@ ${cleanText}
                                 padding: '5px 3px',
                                 fontSize: '10px',
                                 borderRadius: '4px',
-                                border: field.type === 'kanji' ? '2px solid #4F46E5' : '1px solid #d1d5db',
-                                backgroundColor: field.type === 'kanji' ? '#4F46E5' : 'white',
-                                color: field.type === 'kanji' ? 'white' : '#6b7280',
+                                border: field.type === 'kanji' ? '2px solid var(--accent)' : '1px solid var(--border)',
+                                backgroundColor: field.type === 'kanji' ? 'var(--accent)' : 'white',
+                                color: field.type === 'kanji' ? 'white' : 'var(--muted)',
                                 cursor: 'pointer',
                                 fontWeight: field.type === 'kanji' ? '600' : '400',
                                 transition: 'all 0.2s'
@@ -2674,12 +2691,12 @@ ${cleanText}
                           {sampleData.length > 0 ? (
                             <div style={{
                               fontSize: '12px',
-                              color: '#374151',
+                              color: 'var(--ink)',
                               padding: '6px 10px',
-                              backgroundColor: '#f9fafb',
+                              backgroundColor: 'var(--paper)',
                               borderRadius: '4px',
-                              border: '1px solid #e5e7eb',
-                              borderLeft: '3px solid #3b82f6',
+                              border: '1px solid var(--border)',
+                              borderLeft: '3px solid var(--accent)',
                               minHeight: '30px',
                               display: 'flex',
                               alignItems: 'center',
@@ -2694,7 +2711,7 @@ ${cleanText}
                               )}
                             </div>
                           ) : (
-                            <div style={{ fontSize: '10px', color: '#9ca3af' }}>無預覽</div>
+                            <div style={{ fontSize: '10px', color: 'var(--muted-2)' }}>無預覽</div>
                           )}
 
                           {/* 刪除按鈕 */}
@@ -2755,9 +2772,9 @@ ${cleanText}
                               padding: '8px',
                               fontSize: '20px',
                               borderRadius: '6px',
-                              border: '2px solid #10b981',
+                              border: '2px solid var(--success)',
                               backgroundColor: '#ecfdf5',
-                              color: '#10b981',
+                              color: 'var(--success)',
                               cursor: 'pointer',
                               transition: 'all 0.2s',
                               display: 'flex',
@@ -2765,12 +2782,12 @@ ${cleanText}
                               justifyContent: 'center'
                             }}
                             onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = '#10b981';
+                              e.currentTarget.style.backgroundColor = 'var(--success)';
                               e.currentTarget.style.color = 'white';
                             }}
                             onMouseLeave={(e) => {
                               e.currentTarget.style.backgroundColor = '#ecfdf5';
-                              e.currentTarget.style.color = '#10b981';
+                              e.currentTarget.style.color = 'var(--success)';
                             }}
                             title="試聽語音效果"
                           >
@@ -2808,7 +2825,7 @@ ${cleanText}
 
                           {/* 速度滑桿 (0.5-3倍速) */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                            <span style={{ fontSize: '9px', color: '#9ca3af' }}>
+                            <span style={{ fontSize: '9px', color: 'var(--muted-2)' }}>
                               速度 {(field.voiceStyle?.rateMultiplier || 1.0).toFixed(1)}x
                             </span>
                             <input
@@ -2857,7 +2874,7 @@ ${cleanText}
 
                           {/* 音量 */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                            <span style={{ fontSize: '9px', color: '#9ca3af' }}>
+                            <span style={{ fontSize: '9px', color: 'var(--muted-2)' }}>
                               音量 {Math.round((field.voiceStyle?.volume || 1.0) * 100)}%
                             </span>
                             <input
@@ -2881,7 +2898,7 @@ ${cleanText}
           </div>
 
           <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#dbeafe', borderRadius: '6px' }}>
-            <p style={{ fontSize: '14px', color: '#1e40af', margin: 0 }}>
+            <p style={{ fontSize: '14px', color: 'var(--accent-dark)', margin: 0 }}>
               <strong>使用說明：</strong><br />
               • <strong>拖曳排序</strong>：按住左側 ⋮⋮ 手柄拖曳來調整欄位順序<br />
               • <strong>欄位鍵名</strong>：用於程式內部識別，建議使用英文（創建後不可修改）<br />
@@ -3064,7 +3081,7 @@ ${cleanText}
                   padding: '3px 6px',
                   fontSize: '11px',
                   backgroundColor: settings.azureTTS.enabled && settings.azureTTS.subscriptionKey ? '#dcfce7' : '#fef3c7',
-                  color: settings.azureTTS.enabled && settings.azureTTS.subscriptionKey ? '#166534' : '#92400e',
+                  color: settings.azureTTS.enabled && settings.azureTTS.subscriptionKey ? '#166534' : 'var(--accent-dark)',
                   border: `1px solid ${settings.azureTTS.enabled && settings.azureTTS.subscriptionKey ? '#bbf7d0' : '#fde68a'}`,
                   borderRadius: '3px',
                   cursor: 'pointer',
@@ -3098,7 +3115,7 @@ ${cleanText}
             {/* 測試區域 */}
             <div style={{ 
               padding: '15px', 
-              backgroundColor: '#f3f4f6', 
+              backgroundColor: 'var(--paper)', 
               borderRadius: '6px',
               marginBottom: '20px'
             }}>
@@ -3115,7 +3132,7 @@ ${cleanText}
                   borderRadius: '4px',
                   fontSize: '12px',
                   backgroundColor: settings.azureTTS.enabled && settings.azureTTS.subscriptionKey ? '#dcfce7' : '#fef3c7',
-                  color: settings.azureTTS.enabled && settings.azureTTS.subscriptionKey ? '#166534' : '#92400e'
+                  color: settings.azureTTS.enabled && settings.azureTTS.subscriptionKey ? '#166534' : 'var(--accent-dark)'
                 }}>
                   <span style={{ fontSize: '10px' }}>
                     {settings.azureTTS.enabled && settings.azureTTS.subscriptionKey ? '●' : '●'}
@@ -3136,7 +3153,7 @@ ${cleanText}
                   disabled={isTesting}
                   style={{
                     ...styles.button,
-                    backgroundColor: isTesting ? '#d1d5db' : '#10b981',
+                    backgroundColor: isTesting ? 'var(--border)' : 'var(--success)',
                     opacity: isTesting ? 0.6 : 1
                   }}
                 >
@@ -3148,7 +3165,7 @@ ${cleanText}
             {/* 語音設定 */}
             <div style={{ 
               padding: '15px', 
-              backgroundColor: '#f9fafb', 
+              backgroundColor: 'var(--paper)', 
               borderRadius: '6px',
               marginBottom: '20px'
             }}>
@@ -3237,7 +3254,7 @@ ${cleanText}
                         speakWithBrowserVoice('速度測試範例', preferredLang, editStyle).catch(console.error);
                       }
                     }}
-                    style={{ ...styles.button, padding: '4px 8px', fontSize: '12px', backgroundColor: '#10b981' }}
+                    style={{ ...styles.button, padding: '4px 8px', fontSize: '12px', backgroundColor: 'var(--success)' }}
                     title="試聽此設定"
                   >
   ♪
@@ -3293,7 +3310,7 @@ ${cleanText}
                         speakWithBrowserVoice('音調測試範例', preferredLang, editStyle).catch(console.error);
                       }
                     }}
-                    style={{ ...styles.button, padding: '4px 8px', fontSize: '12px', backgroundColor: '#10b981' }}
+                    style={{ ...styles.button, padding: '4px 8px', fontSize: '12px', backgroundColor: 'var(--success)' }}
                     title="試聽此設定"
                   >
   ♪
@@ -3349,7 +3366,7 @@ ${cleanText}
                         speakWithBrowserVoice('情感風格測試', preferredLang, editStyle).catch(console.error);
                       }
                     }}
-                    style={{ ...styles.button, padding: '4px 8px', fontSize: '12px', backgroundColor: '#10b981' }}
+                    style={{ ...styles.button, padding: '4px 8px', fontSize: '12px', backgroundColor: 'var(--success)' }}
                     title="試聽此設定"
                   >
   ♪
@@ -3392,7 +3409,7 @@ ${cleanText}
                     }}
                     style={{ flex: 1 }}
                   />
-                  <span style={{ fontSize: '12px', color: '#6b7280', minWidth: '40px' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--muted)', minWidth: '40px' }}>
                     {Math.round(editStyle.volume * 100)}%
                   </span>
                   <button
@@ -3406,7 +3423,7 @@ ${cleanText}
                         speakWithBrowserVoice('音量測試範例', preferredLang, editStyle).catch(console.error);
                       }
                     }}
-                    style={{ ...styles.button, padding: '4px 8px', fontSize: '12px', backgroundColor: '#10b981' }}
+                    style={{ ...styles.button, padding: '4px 8px', fontSize: '12px', backgroundColor: 'var(--success)' }}
                     title="試聽此音量"
                   >
   ♪
@@ -3422,7 +3439,7 @@ ${cleanText}
               backgroundColor: '#dbeafe', 
               borderRadius: '6px' 
             }}>
-              <p style={{ fontSize: '14px', color: '#1e40af', margin: 0 }}>
+              <p style={{ fontSize: '14px', color: 'var(--accent-dark)', margin: 0 }}>
                 <strong>ⓘ 使用提示：</strong><br />
                 • ◐ 調整設定時會自動試聽新效果<br />
                 • ♪ 每個選項旁都有試聽按鈕可手動測試<br />
@@ -3758,7 +3775,7 @@ ${cleanText}
             <button onClick={() => setShowImportDialog(false)} style={styles.buttonGray}>關閉</button>
           </div>
 
-          <div style={{ margin: '20px 0', padding: '15px', backgroundColor: '#f3f4f6', borderRadius: '6px' }}>
+          <div style={{ margin: '20px 0', padding: '15px', backgroundColor: 'var(--paper)', borderRadius: '6px' }}>
             <h4 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '10px' }}>匯入模式</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
@@ -3769,7 +3786,7 @@ ${cleanText}
                   checked={importMode === 'replace'}
                   onChange={(e) => setImportMode(e.target.value)}
                 />
-                <span style={{ color: '#10b981', fontWeight: importMode === 'replace' ? '600' : '400' }}>
+                <span style={{ color: 'var(--success)', fontWeight: importMode === 'replace' ? '600' : '400' }}>
                   建立新資料夾 - 將匯入的卡片建立為獨立的新資料夾
                 </span>
               </label>
@@ -3783,7 +3800,7 @@ ${cleanText}
                   disabled={!currentFolder}
                 />
                 <span style={{
-                  color: currentFolder ? '#6b7280' : '#d1d5db',
+                  color: currentFolder ? 'var(--muted)' : 'var(--border)',
                   fontWeight: importMode === 'append' ? '600' : '400'
                 }}>
                   附加到現有資料夾 - 將新卡片添加到當前資料夾
@@ -3794,7 +3811,7 @@ ${cleanText}
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div style={{ padding: '15px', border: '1px solid #d1d5db', borderRadius: '6px' }}>
+            <div style={{ padding: '15px', border: '1px solid var(--border)', borderRadius: '6px' }}>
               <h4 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '10px' }}>從 Google 試算表匯入</h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <input
@@ -3809,21 +3826,21 @@ ${cleanText}
                   disabled={isLoading}
                   style={{ 
                     ...styles.buttonGreen, 
-                    backgroundColor: isLoading ? '#9ca3af' : '#16a34a'
+                    backgroundColor: isLoading ? 'var(--muted-2)' : '#16a34a'
                   }}
                 >
                   {isLoading ? '匯入中...' : '從 Google 試算表匯入'}
                 </button>
               </div>
               <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#dbeafe', borderRadius: '6px' }}>
-                <p style={{ fontSize: '14px', color: '#1e40af', margin: 0 }}>
+                <p style={{ fontSize: '14px', color: 'var(--accent-dark)', margin: 0 }}>
                   <strong>設定步驟：</strong><br />
                   1. 開啟 Google 試算表 → 2. 點擊「共用」→ 3. 設為「知道連結的使用者」可檢視 → 4. 複製連結
                 </p>
               </div>
             </div>
 
-            <div style={{ padding: '15px', border: '1px solid #d1d5db', borderRadius: '6px' }}>
+            <div style={{ padding: '15px', border: '1px solid var(--border)', borderRadius: '6px' }}>
               <h4 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '10px' }}>從 CSV 文字匯入</h4>
               <textarea
                 placeholder="貼上 CSV 數據，例如：&#10;漢字,ひらがな,意味&#10;学校[がっこう],がっこう,學校"
@@ -3839,9 +3856,9 @@ ${cleanText}
               </button>
             </div>
 
-            <div style={{ padding: '15px', border: '1px solid #d1d5db', borderRadius: '6px' }}>
+            <div style={{ padding: '15px', border: '1px solid var(--border)', borderRadius: '6px' }}>
               <h4 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '10px' }}>從 Anki 檔案匯入</h4>
-              <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '10px' }}>
+              <p style={{ fontSize: '13px', color: 'var(--muted)', marginBottom: '10px' }}>
                 支援匯入 Anki 卡包 (.apkg) 或純文字 (.txt) 檔案
               </p>
               <input
@@ -3859,14 +3876,14 @@ ${cleanText}
               </button>
             </div>
 
-            <div style={{ padding: '15px', border: '2px solid #10b981', borderRadius: '6px', backgroundColor: '#ecfdf5' }}>
-              <h4 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '10px', color: '#059669' }}>☁️ 雲端同步</h4>
-              <p style={{ fontSize: '13px', color: '#047857', marginBottom: '10px' }}>
+            <div style={{ padding: '15px', border: '2px solid var(--success)', borderRadius: '6px', backgroundColor: '#ecfdf5' }}>
+              <h4 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '10px', color: 'var(--success)' }}>☁️ 雲端同步</h4>
+              <p style={{ fontSize: '13px', color: 'var(--success-dark)', marginBottom: '10px' }}>
                 將資料同步到雲端，讓您在電腦和手機都能存取相同的卡片
               </p>
               <button
                 onClick={() => setShowSyncDialog(true)}
-                style={{ ...styles.button, backgroundColor: '#10b981', borderColor: '#10b981' }}
+                style={{ ...styles.button, backgroundColor: 'var(--success)', borderColor: 'var(--success)' }}
               >
                 ☁️ 開啟雲端同步設定
               </button>
@@ -4016,7 +4033,7 @@ ${cleanText}
           </div>
 
           <div style={{ margin: '15px 0', padding: '15px', backgroundColor: '#f0f9ff', borderRadius: '6px' }}>
-            <p style={{ fontSize: '14px', color: '#0369a1', margin: 0 }}>
+            <p style={{ fontSize: '14px', color: 'var(--accent-dark)', margin: 0 }}>
               <strong>📊 檔案資訊:</strong> {apkgPreviewData.fileName} <br />
               <strong>📝 總卡片數:</strong> {apkgPreviewData.ankiCards.length} 張<br />
               <strong>📂 發現欄位:</strong> {apkgPreviewData.fieldAnalysis.length} 個<br />
@@ -4033,7 +4050,7 @@ ${cleanText}
             </button>
           </div>
 
-          <div style={{ maxHeight: '500px', overflowY: 'auto', border: '1px solid #d1d5db', borderRadius: '6px' }}>
+          <div style={{ maxHeight: '500px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: '6px' }}>
             {apkgPreviewData.fieldAnalysis.map((field, index) => {
               const isSelected = selectedFields.some(f => f.name === field.name);
               const fieldType = selectedFields.find(f => f.name === field.name)?.type || 'text';
@@ -4043,7 +4060,7 @@ ${cleanText}
                   key={field.name}
                   style={{
                     padding: '16px',
-                    borderBottom: index < apkgPreviewData.fieldAnalysis.length - 1 ? '1px solid #e5e7eb' : 'none',
+                    borderBottom: index < apkgPreviewData.fieldAnalysis.length - 1 ? '1px solid var(--border)' : 'none',
                     backgroundColor: isSelected ? '#eff6ff' : 'white'
                   }}
                 >
@@ -4056,8 +4073,8 @@ ${cleanText}
                     />
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <strong style={{ fontSize: '15px', color: '#1f2937' }}>{field.name}</strong>
-                        <span style={{ fontSize: '12px', color: '#6b7280', padding: '2px 8px', backgroundColor: '#f3f4f6', borderRadius: '4px' }}>
+                        <strong style={{ fontSize: '15px', color: 'var(--ink)' }}>{field.name}</strong>
+                        <span style={{ fontSize: '12px', color: 'var(--muted)', padding: '2px 8px', backgroundColor: 'var(--paper)', borderRadius: '4px' }}>
                           {field.percentage}% ({field.count}/{apkgPreviewData.ankiCards.length})
                         </span>
                       </div>
@@ -4065,7 +4082,7 @@ ${cleanText}
                       {/* 類型切換按鈕 */}
                       {isSelected && (
                         <div style={{ marginBottom: '8px' }}>
-                          <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>
+                          <div style={{ fontSize: '12px', color: 'var(--muted)', marginBottom: '4px' }}>
                             欄位類型:
                           </div>
                           <div style={{ display: 'flex', gap: '8px' }}>
@@ -4078,9 +4095,9 @@ ${cleanText}
                                 padding: '6px 16px',
                                 fontSize: '13px',
                                 borderRadius: '6px',
-                                border: fieldType === 'text' ? '2px solid #4F46E5' : '1px solid #d1d5db',
-                                backgroundColor: fieldType === 'text' ? '#4F46E5' : 'white',
-                                color: fieldType === 'text' ? 'white' : '#6b7280',
+                                border: fieldType === 'text' ? '2px solid var(--accent)' : '1px solid var(--border)',
+                                backgroundColor: fieldType === 'text' ? 'var(--accent)' : 'white',
+                                color: fieldType === 'text' ? 'white' : 'var(--muted)',
                                 cursor: 'pointer',
                                 fontWeight: fieldType === 'text' ? '600' : '400'
                               }}
@@ -4096,9 +4113,9 @@ ${cleanText}
                                 padding: '6px 16px',
                                 fontSize: '13px',
                                 borderRadius: '6px',
-                                border: fieldType === 'kanji' ? '2px solid #4F46E5' : '1px solid #d1d5db',
-                                backgroundColor: fieldType === 'kanji' ? '#4F46E5' : 'white',
-                                color: fieldType === 'kanji' ? 'white' : '#6b7280',
+                                border: fieldType === 'kanji' ? '2px solid var(--accent)' : '1px solid var(--border)',
+                                backgroundColor: fieldType === 'kanji' ? 'var(--accent)' : 'white',
+                                color: fieldType === 'kanji' ? 'white' : 'var(--muted)',
                                 cursor: 'pointer',
                                 fontWeight: fieldType === 'kanji' ? '600' : '400'
                               }}
@@ -4112,14 +4129,14 @@ ${cleanText}
                       {/* 預覽內容 */}
                       <div style={{
                         padding: '10px',
-                        backgroundColor: '#f9fafb',
+                        backgroundColor: 'var(--paper)',
                         borderRadius: '6px',
-                        border: '1px solid #e5e7eb'
+                        border: '1px solid var(--border)'
                       }}>
-                        <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '4px' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--muted-2)', marginBottom: '4px' }}>
                           預覽:
                         </div>
-                        <div style={{ fontSize: '13px', color: '#374151', lineHeight: '1.5' }}>
+                        <div style={{ fontSize: '13px', color: 'var(--ink)', lineHeight: '1.5' }}>
                           {isSelected && fieldType === 'kanji' ? (
                             <KanjiWithFurigana text={field.sample} showFurigana={true} />
                           ) : (
@@ -4219,7 +4236,7 @@ ${cleanText}
         zIndex: 10000
       }} onClick={() => setShowGroupDialog(false)}>
         <div style={{
-          backgroundColor: 'white',
+          backgroundColor: 'var(--paper)',
           borderRadius: '12px',
           padding: '32px',
           maxWidth: '700px',
@@ -4233,7 +4250,7 @@ ${cleanText}
             fontSize: '24px',
             fontWeight: 'bold',
             marginBottom: '24px',
-            color: '#1f2937'
+            color: 'var(--ink)'
           }}>
             依欄位分組建立子資料夾
           </h2>
@@ -4243,7 +4260,7 @@ ${cleanText}
               display: 'block',
               marginBottom: '8px',
               fontWeight: '600',
-              color: '#374151'
+              color: 'var(--ink)'
             }}>
               選擇分組欄位:
             </label>
@@ -4255,7 +4272,7 @@ ${cleanText}
                 padding: '12px',
                 fontSize: '16px',
                 borderRadius: '8px',
-                border: '2px solid #e5e7eb',
+                border: '2px solid var(--border)',
                 outline: 'none'
               }}
             >
@@ -4270,15 +4287,15 @@ ${cleanText}
             <div style={{
               marginBottom: '24px',
               padding: '16px',
-              backgroundColor: '#f9fafb',
+              backgroundColor: 'var(--paper)',
               borderRadius: '8px',
-              border: '1px solid #e5e7eb'
+              border: '1px solid var(--border)'
             }}>
               <h3 style={{
                 fontSize: '16px',
                 fontWeight: '600',
                 marginBottom: '12px',
-                color: '#374151'
+                color: 'var(--ink)'
               }}>
                 分組預覽 (共 {Object.keys(groupPreview).length} 個群組):
               </h3>
@@ -4294,23 +4311,23 @@ ${cleanText}
                   .map(([value, cards]) => (
                     <div key={value} style={{
                       padding: '12px',
-                      backgroundColor: 'white',
+                      backgroundColor: 'var(--paper)',
                       borderRadius: '6px',
-                      border: '1px solid #e5e7eb',
+                      border: '1px solid var(--border)',
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center'
                     }}>
                       <span style={{
                         fontWeight: '500',
-                        color: '#1f2937',
+                        color: 'var(--ink)',
                         flex: 1
                       }}>
                         {value || '(空白)'}
                       </span>
                       <span style={{
                         padding: '4px 12px',
-                        backgroundColor: '#4F46E5',
+                        backgroundColor: 'var(--accent)',
                         color: 'white',
                         borderRadius: '12px',
                         fontSize: '14px',
@@ -4335,9 +4352,9 @@ ${cleanText}
                 padding: '12px 24px',
                 fontSize: '16px',
                 borderRadius: '8px',
-                border: '2px solid #e5e7eb',
-                backgroundColor: 'white',
-                color: '#6b7280',
+                border: '2px solid var(--border)',
+                backgroundColor: 'var(--paper)',
+                color: 'var(--muted)',
                 cursor: 'pointer',
                 fontWeight: '600'
               }}
@@ -4352,7 +4369,7 @@ ${cleanText}
                 fontSize: '16px',
                 borderRadius: '8px',
                 border: 'none',
-                backgroundColor: selectedField ? '#4F46E5' : '#9ca3af',
+                backgroundColor: selectedField ? 'var(--accent)' : 'var(--muted-2)',
                 color: 'white',
                 cursor: selectedField ? 'pointer' : 'not-allowed',
                 fontWeight: '600'
@@ -4471,7 +4488,7 @@ ${cleanText}
 ↓ 匯入
               </button>
               <button 
-                style={{ ...styles.button, backgroundColor: '#10b981' }} 
+                style={{ ...styles.button, backgroundColor: 'var(--success)' }} 
                 onClick={exportToCSV}
                 title="匯出CSV檔案"
               >
@@ -4489,13 +4506,13 @@ ${cleanText}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {editData.map((row, rowIndex) => (
                   <div key={row.id || rowIndex} style={{
-                    border: '1px solid #e5e7eb',
+                    border: '1px solid var(--border)',
                     borderRadius: '8px',
                     padding: '12px',
                     backgroundColor: '#ffffff'
                   }}>
                     <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '14px', fontWeight: '600', color: '#374151' }}>卡片 {rowIndex + 1}</span>
+                      <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--ink)' }}>卡片 {rowIndex + 1}</span>
                       <button
                         style={{ ...styles.buttonRed, padding: '6px 12px', fontSize: '13px' }}
                         onClick={() => deleteRow(rowIndex)}
@@ -4507,7 +4524,7 @@ ${cleanText}
                       .sort(([,a], [,b]) => (a.order || 0) - (b.order || 0))
                       .map(([fieldKey, field]) => (
                         <div key={fieldKey} style={{ marginBottom: '10px' }}>
-                          <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#6b7280', marginBottom: '4px' }}>
+                          <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--muted)', marginBottom: '4px' }}>
                             {field.label}
                           </label>
                           <textarea
@@ -4516,7 +4533,7 @@ ${cleanText}
                             style={{
                               width: '100%',
                               fontSize: '14px',
-                              border: '1px solid #d1d5db',
+                              border: '1px solid var(--border)',
                               borderRadius: '6px',
                               padding: '8px',
                               resize: 'vertical',
@@ -4532,14 +4549,14 @@ ${cleanText}
               </div>
             ) : (
               /* 桌面版：表格視圖 */
-              <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #d1d5db' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid var(--border)' }}>
                 <thead>
-                  <tr style={{ backgroundColor: '#f3f4f6' }}>
-                    <th style={{ border: '1px solid #d1d5db', padding: '8px', fontSize: '12px' }}>操作</th>
+                  <tr style={{ backgroundColor: 'var(--paper)' }}>
+                    <th style={{ border: '1px solid var(--border)', padding: '8px', fontSize: '12px' }}>操作</th>
                     {Object.entries(currentFields)
                       .sort(([,a], [,b]) => (a.order || 0) - (b.order || 0))
                       .map(([key, field]) => (
-                      <th key={key} style={{ border: '1px solid #d1d5db', padding: '8px', fontSize: '12px', minWidth: '120px' }}>
+                      <th key={key} style={{ border: '1px solid var(--border)', padding: '8px', fontSize: '12px', minWidth: '120px' }}>
                         {field.label}
                       </th>
                     ))}
@@ -4548,7 +4565,7 @@ ${cleanText}
                 <tbody>
                   {editData.map((row, rowIndex) => (
                     <tr key={row.id || rowIndex}>
-                      <td style={{ border: '1px solid #d1d5db', padding: '4px', textAlign: 'center' }}>
+                      <td style={{ border: '1px solid var(--border)', padding: '4px', textAlign: 'center' }}>
                         <button
                           style={{ ...styles.buttonRed, padding: '4px 8px', fontSize: '12px' }}
                           onClick={() => deleteRow(rowIndex)}
@@ -4559,7 +4576,7 @@ ${cleanText}
                       {Object.entries(currentFields)
                         .sort(([,a], [,b]) => (a.order || 0) - (b.order || 0))
                         .map(([fieldKey, field]) => (
-                        <td key={fieldKey} style={{ border: '1px solid #d1d5db', padding: '4px' }}>
+                        <td key={fieldKey} style={{ border: '1px solid var(--border)', padding: '4px' }}>
                           <textarea
                             value={row[fieldKey] || ''}
                             onChange={(e) => updateCell(rowIndex, fieldKey, e.target.value)}
@@ -4585,7 +4602,7 @@ ${cleanText}
 
           {/* 顯示提示資訊 */}
           <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f0f9ff', borderRadius: '6px' }}>
-            <p style={{ fontSize: '14px', color: '#0369a1', margin: 0 }}>
+            <p style={{ fontSize: '14px', color: 'var(--accent-dark)', margin: 0 }}>
               <strong>ⓘ 使用提示：</strong><br />
               • ✎ <strong>欄位編輯</strong>：新增、刪除、修改欄位定義<br />
               • ↓ <strong>匯入</strong>：從Google試算表或CSV文字匯入資料<br />
@@ -4695,7 +4712,7 @@ ${cleanText}
                     style={{ 
                       flex: 1, 
                       padding: '8px 12px', 
-                      border: '1px solid #d1d5db', 
+                      border: '1px solid var(--border)', 
                       borderRadius: '4px',
                       fontSize: '14px'
                     }}
@@ -4712,9 +4729,9 @@ ${cleanText}
                         padding: '8px 12px',
                         fontSize: '12px',
                         borderRadius: '4px',
-                        border: '1px solid #d1d5db',
-                        backgroundColor: template.fields.includes(fieldKey) ? '#10b981' : 'white',
-                        color: template.fields.includes(fieldKey) ? 'white' : '#374151',
+                        border: '1px solid var(--border)',
+                        backgroundColor: template.fields.includes(fieldKey) ? 'var(--success)' : 'white',
+                        color: template.fields.includes(fieldKey) ? 'white' : 'var(--ink)',
                         cursor: 'pointer'
                       }}
                     >
@@ -4723,7 +4740,7 @@ ${cleanText}
                   ))}
                 </div>
                 
-                <div style={{ marginTop: '10px', fontSize: '12px', color: '#6b7280' }}>
+                <div style={{ marginTop: '10px', fontSize: '12px', color: 'var(--muted)' }}>
                   已選擇 {template.fields.length} 個欄位：{template.fields.map(f => getCurrentFields()[f]?.label).join('、')}
                 </div>
               </div>
@@ -4744,7 +4761,7 @@ ${cleanText}
     return (
       <div style={{
         minHeight: '100vh',
-        backgroundColor: '#1f2937',
+        backgroundColor: 'var(--ink)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -4774,7 +4791,7 @@ ${cleanText}
             position: 'absolute',
             top: '20px',
             right: '20px',
-            backgroundColor: '#dc2626',
+            backgroundColor: 'var(--danger)',
             color: 'white',
             border: 'none',
             padding: '12px 20px',
@@ -4788,7 +4805,7 @@ ${cleanText}
 
         {/* 卡片顯示區域 */}
         <div style={{
-          backgroundColor: 'white',
+          backgroundColor: 'var(--paper)',
           borderRadius: '16px',
           padding: '40px',
           maxWidth: '800px',
@@ -4814,10 +4831,10 @@ ${cleanText}
 
                 return (
                   <div key={fieldKey} style={{ textAlign: 'center', flex: 1 }}>
-                    <div style={{ fontSize: '11px', color: '#92400e', marginBottom: '4px', fontWeight: '500' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--accent-dark)', marginBottom: '4px', fontWeight: '500' }}>
                       {field?.label || fieldKey}
                     </div>
-                    <div style={{ fontSize: '13px', color: '#78350f', fontWeight: '600' }}>
+                    <div style={{ fontSize: '13px', color: 'var(--accent-dark)', fontWeight: '600' }}>
                       {field?.type === 'kanji' ?
                         value.replace(/\[.*?\]/g, '') : // 頂部欄位移除注音
                         value
@@ -4829,7 +4846,7 @@ ${cleanText}
             </div>
           )}
 
-          <div style={{ fontSize: '18px', color: '#6b7280', marginBottom: '10px' }}>
+          <div style={{ fontSize: '18px', color: 'var(--muted)', marginBottom: '10px' }}>
             {template.name}
           </div>
 
@@ -4852,7 +4869,7 @@ ${cleanText}
                   <div style={{
                     fontSize: `${fieldStyle.fontSize}px`,
                     lineHeight: fieldStyle.lineHeight || 1.8,
-                    color: fieldStyle.color || '#1f2937',
+                    color: fieldStyle.color || 'var(--ink)',
                     fontFamily: fieldStyle.fontFamily
                   }}>
                     <KanjiWithFurigana text={value} showFurigana={template.showFurigana} />
@@ -4861,7 +4878,7 @@ ${cleanText}
                   <div style={{
                     fontSize: `${fieldStyle.fontSize}px`,
                     lineHeight: fieldStyle.lineHeight || 1.4,
-                    color: fieldStyle.color || '#374151',
+                    color: fieldStyle.color || 'var(--ink)',
                     fontFamily: fieldStyle.fontFamily
                   }}>
                     {value}
@@ -4937,14 +4954,14 @@ ${cleanText}
       <div style={{
         marginTop: '16px',
         padding: isMobile ? '12px' : '16px',
-        backgroundColor: '#F3F4F6',
+        backgroundColor: 'var(--paper)',
         borderRadius: '12px',
         border: '2px solid #E5E7EB'
       }}>
         {/* 音檔來源標籤 */}
         <div style={{
           fontSize: '11px',
-          color: '#6b7280',
+          color: 'var(--muted)',
           marginBottom: '8px',
           display: 'flex',
           alignItems: 'center',
@@ -4965,7 +4982,7 @@ ${cleanText}
             borderRadius: '8px',
             border: 'none',
             cursor: 'pointer',
-            backgroundColor: '#4F46E5',
+            backgroundColor: 'var(--accent)',
             color: 'white',
             marginBottom: '12px',
             transition: 'all 0.2s',
@@ -4974,8 +4991,8 @@ ${cleanText}
             justifyContent: 'center',
             gap: '8px'
           }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#4338CA'}
-          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#4F46E5'}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--accent-dark)'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--accent)'}
         >
           <span style={{ fontSize: '20px' }}>{isPlaying ? '⏸' : '▶'}</span>
           <span>{isPlaying ? '暫停' : '播放'}</span>
@@ -4993,7 +5010,7 @@ ${cleanText}
         }}>
           <div style={{
             height: '100%',
-            backgroundColor: '#4F46E5',
+            backgroundColor: 'var(--accent)',
             borderRadius: '3px',
             width: `${progress}%`,
             transition: 'width 0.1s'
@@ -5005,7 +5022,7 @@ ${cleanText}
           display: 'flex',
           justifyContent: 'space-between',
           fontSize: '11px',
-          color: '#6b7280',
+          color: 'var(--muted)',
           marginBottom: '12px'
         }}>
           <span>{formatTime(currentTime)}</span>
@@ -5017,7 +5034,7 @@ ${cleanText}
           <label style={{
             fontSize: '12px',
             fontWeight: '600',
-            color: '#374151',
+            color: 'var(--ink)',
             marginBottom: '6px',
             display: 'block'
           }}>
@@ -5036,7 +5053,7 @@ ${cleanText}
             display: 'flex',
             justifyContent: 'space-between',
             fontSize: '10px',
-            color: '#9ca3af'
+            color: 'var(--muted-2)'
           }}>
             <span>0.5x</span>
             <span>1.0x</span>
@@ -5312,7 +5329,7 @@ ${cleanText}
     return (
       <div style={{
         minHeight: '100vh',
-        backgroundColor: '#1f2937',
+        backgroundColor: 'var(--ink)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -5342,7 +5359,7 @@ ${cleanText}
             position: 'absolute',
             top: '20px',
             right: '20px',
-            backgroundColor: '#dc2626',
+            backgroundColor: 'var(--danger)',
             color: 'white',
             border: 'none',
             padding: '12px 20px',
@@ -5358,14 +5375,14 @@ ${cleanText}
         <div
           key={`card-${currentCardIndex}`}
           style={{
-          backgroundColor: 'white',
+          backgroundColor: 'var(--paper)',
           borderRadius: '16px',
           padding: '40px',
           maxWidth: '800px',
           width: '90%',
           boxShadow: '0 10px 25px rgba(0,0,0,0.2)'
         }}>
-          <div style={{ fontSize: '18px', color: '#6b7280', marginBottom: '20px', textAlign: 'center' }}>
+          <div style={{ fontSize: '18px', color: 'var(--muted)', marginBottom: '20px', textAlign: 'center' }}>
             {currentPage?.name}
           </div>
 
@@ -5388,7 +5405,7 @@ ${cleanText}
                   <div style={{
                     fontSize: '32px',
                     lineHeight: 1.8,
-                    color: '#1f2937',
+                    color: 'var(--ink)',
                     fontWeight: 'bold'
                   }}>
                     <KanjiWithFurigana text={value} showFurigana={settings.showFurigana} />
@@ -5397,7 +5414,7 @@ ${cleanText}
                   <div style={{
                     fontSize: field?.type === 'meaning' ? '24px' : '20px',
                     lineHeight: 1.6,
-                    color: '#374151'
+                    color: 'var(--ink)'
                   }}>
                     {value}
                   </div>
@@ -5648,7 +5665,7 @@ ${cleanText}
             </button>
             <h1 style={{ fontSize: isMobile ? '18px' : '24px', fontWeight: 'bold' }}>學習模式 - {currentFolder.name}</h1>
           </div>
-          <div style={{ fontSize: isMobile ? '13px' : '14px', color: '#6b7280', width: isMobile ? '100%' : 'auto', textAlign: isMobile ? 'right' : 'left' }}>
+          <div style={{ fontSize: isMobile ? '13px' : '14px', color: 'var(--muted)', width: isMobile ? '100%' : 'auto', textAlign: isMobile ? 'right' : 'left' }}>
             卡片 {currentCardIndex + 1}/{cards.length}
           </div>
         </div>
@@ -5657,7 +5674,7 @@ ${cleanText}
           {/* 顯示控制區域 */}
           <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f8fafc', borderRadius: '6px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-              <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: '#374151' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--ink)' }}>
                 📋 卡片顯示模板
               </h3>
               <button
@@ -5669,7 +5686,7 @@ ${cleanText}
                     padding: '6px 12px',
                     fontSize: '12px',
                     borderRadius: '4px',
-                    border: '1px solid #d1d5db',
+                    border: '1px solid var(--border)',
                     backgroundColor: '#6366f1',
                     color: 'white',
                     cursor: 'pointer'
@@ -5689,9 +5706,9 @@ ${cleanText}
                     padding: isMobile ? '8px 10px' : '10px 14px',
                     fontSize: isMobile ? '12px' : '14px',
                     borderRadius: '8px',
-                    border: '2px solid #d1d5db',
-                    backgroundColor: currentTemplate === templateId ? '#10b981' : 'white',
-                    color: currentTemplate === templateId ? 'white' : '#374151',
+                    border: '2px solid var(--border)',
+                    backgroundColor: currentTemplate === templateId ? 'var(--success)' : 'white',
+                    color: currentTemplate === templateId ? 'white' : 'var(--ink)',
                     cursor: 'pointer',
                     fontWeight: currentTemplate === templateId ? 'bold' : 'normal',
                     boxShadow: currentTemplate === templateId ? '0 4px 12px rgba(16, 185, 129, 0.3)' : '0 2px 4px rgba(0, 0, 0, 0.1)',
@@ -5716,7 +5733,7 @@ ${cleanText}
               ))}
             </div>
             
-            <div style={{ marginTop: '10px', fontSize: '12px', color: '#6b7280', textAlign: 'center' }}>
+            <div style={{ marginTop: '10px', fontSize: '12px', color: 'var(--muted)', textAlign: 'center' }}>
               當前模板：{displayTemplates[currentTemplate]?.name} 
               ({displayTemplates[currentTemplate]?.fields.length} 個欄位)
               {displayTemplates[currentTemplate]?.showFurigana ? ' | 顯示注音' : ' | 隱藏注音'}
@@ -5753,10 +5770,10 @@ ${cleanText}
 
                         return (
                           <div key={fieldKey} style={{ textAlign: 'center', flex: 1 }}>
-                            <div style={{ fontSize: '11px', color: '#92400e', marginBottom: '4px', fontWeight: '500' }}>
+                            <div style={{ fontSize: '11px', color: 'var(--accent-dark)', marginBottom: '4px', fontWeight: '500' }}>
                               {field?.label || fieldKey}
                             </div>
-                            <div style={{ fontSize: '13px', color: '#78350f', fontWeight: '600' }}>
+                            <div style={{ fontSize: '13px', color: 'var(--accent-dark)', fontWeight: '600' }}>
                               {field?.type === 'kanji' ?
                                 value.replace(/\[.*?\]/g, '') : // 頂部欄位移除注音
                                 value
@@ -5783,7 +5800,7 @@ ${cleanText}
                           <div style={{
                             fontSize: `${fieldStyle.fontSize}px`,
                             fontWeight: 'bold',
-                            color: fieldStyle.color || '#374151',
+                            color: fieldStyle.color || 'var(--ink)',
                             fontFamily: fieldStyle.fontFamily,
                             lineHeight: fieldStyle.lineHeight || 1.8
                           }}>
@@ -5792,7 +5809,7 @@ ${cleanText}
                         ) : (
                           <p style={{
                             fontSize: `${fieldStyle.fontSize}px`,
-                            color: fieldStyle.color || '#374151',
+                            color: fieldStyle.color || 'var(--ink)',
                             fontFamily: fieldStyle.fontFamily,
                             lineHeight: fieldStyle.lineHeight || 1.4,
                             margin: 0
@@ -5822,7 +5839,7 @@ ${cleanText}
         <div style={styles.card}>
           {/* 播放控制區域 */}
           <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#fef7f0', borderRadius: '6px' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '15px', color: '#374151' }}>
+            <h3 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '15px', color: 'var(--ink)' }}>
               🎵 腳本播放控制
             </h3>
             
@@ -5836,9 +5853,9 @@ ${cleanText}
                     padding: '6px 12px',
                     fontSize: '12px',
                     borderRadius: '4px',
-                    border: '1px solid #d1d5db',
-                    backgroundColor: index === currentScriptIndex ? '#dc2626' : 'white',
-                    color: index === currentScriptIndex ? 'white' : '#374151',
+                    border: '1px solid var(--border)',
+                    backgroundColor: index === currentScriptIndex ? 'var(--danger)' : 'white',
+                    color: index === currentScriptIndex ? 'white' : 'var(--ink)',
                     cursor: 'pointer'
                   }}
                 >
@@ -5847,7 +5864,7 @@ ${cleanText}
               ))}
             </div>
             
-            <p style={{ fontSize: '12px', color: '#6b7280', textAlign: 'center', marginBottom: '15px' }}>
+            <p style={{ fontSize: '12px', color: 'var(--muted)', textAlign: 'center', marginBottom: '15px' }}>
               當前播放腳本：{card.pages[currentScriptIndex]?.name}
             </p>
           </div>
@@ -5858,7 +5875,7 @@ ${cleanText}
               disabled={isPlaying || isAutoPlayingAll}
               style={{
                 ...styles.button,
-                backgroundColor: (isPlaying || isAutoPlayingAll) ? '#9ca3af' : '#2563eb',
+                backgroundColor: (isPlaying || isAutoPlayingAll) ? 'var(--muted-2)' : '#2563eb',
                 padding: '12px 24px',
                 fontSize: '16px'
               }}
@@ -5870,7 +5887,7 @@ ${cleanText}
               disabled={!isPlaying && !isAutoPlayingAll}
               style={{
                 ...styles.buttonRed,
-                backgroundColor: (!isPlaying && !isAutoPlayingAll) ? '#9ca3af' : '#dc2626',
+                backgroundColor: (!isPlaying && !isAutoPlayingAll) ? 'var(--muted-2)' : 'var(--danger)',
                 padding: '12px 24px',
                 fontSize: '16px'
               }}
@@ -5895,7 +5912,7 @@ ${cleanText}
               disabled={isPlaying || isAutoPlayingAll}
               style={{
                 ...styles.button,
-                backgroundColor: '#6b7280',
+                backgroundColor: 'var(--muted)',
                 padding: '12px 24px',
                 fontSize: '16px'
               }}
@@ -5906,7 +5923,7 @@ ${cleanText}
               onClick={() => setSettings({ ...settings, showFurigana: !settings.showFurigana })}
               style={{
                 ...styles.buttonGreen,
-                backgroundColor: settings.showFurigana ? '#16a34a' : '#6b7280',
+                backgroundColor: settings.showFurigana ? '#16a34a' : 'var(--muted)',
                 padding: '12px 24px',
                 fontSize: '16px'
               }}
@@ -5921,7 +5938,7 @@ ${cleanText}
               disabled={isPlaying || isAutoPlayingAll}
               style={{
                 ...styles.button,
-                backgroundColor: (isPlaying || isAutoPlayingAll) ? '#9ca3af' : '#10b981',
+                backgroundColor: (isPlaying || isAutoPlayingAll) ? 'var(--muted-2)' : 'var(--success)',
                 padding: '12px 24px',
                 fontSize: '16px'
               }}
@@ -5933,7 +5950,7 @@ ${cleanText}
               disabled={isPlaying || isAutoPlayingAll}
               style={{
                 ...styles.button,
-                backgroundColor: (isPlaying || isAutoPlayingAll) ? '#9ca3af' : '#8b5cf6',
+                backgroundColor: (isPlaying || isAutoPlayingAll) ? 'var(--muted-2)' : '#8b5cf6',
                 padding: '12px 24px',
                 fontSize: '16px'
               }}
@@ -5948,7 +5965,7 @@ ${cleanText}
               disabled={currentCardIndex === 0}
               style={{ 
                 ...styles.buttonGray, 
-                backgroundColor: currentCardIndex === 0 ? '#d1d5db' : '#6b7280',
+                backgroundColor: currentCardIndex === 0 ? 'var(--border)' : 'var(--muted)',
                 padding: '10px 20px'
               }}
             >
@@ -5959,7 +5976,7 @@ ${cleanText}
               disabled={currentCardIndex >= cards.length - 1}
               style={{ 
                 ...styles.buttonGray, 
-                backgroundColor: currentCardIndex >= cards.length - 1 ? '#d1d5db' : '#6b7280',
+                backgroundColor: currentCardIndex >= cards.length - 1 ? 'var(--border)' : 'var(--muted)',
                 padding: '10px 20px'
               }}
             >
@@ -6086,6 +6103,12 @@ ${cleanText}
       return;
     }
 
+    if (isAutoPlayingRef.current) {
+      return;
+    }
+
+    isAutoPlayingRef.current = true;
+    playbackControlRef.current.shouldContinue = true;
     setIsAutoPlaying(true);
     setCurrentAutoPlayCard(0);
     setCurrentAutoPlayStep(0);
@@ -6102,16 +6125,9 @@ ${cleanText}
 
         console.log(`開始播放卡片 ${cardIndex + 1}/${cards.length}:`, card.fields.kanji || '未命名');
 
-        // 創建一個局部的顯示模板狀態管理器
-        let currentDisplayTemplate = currentTemplate;
-        const setCurrentDisplayTemplate = (templateId) => {
-          currentDisplayTemplate = templateId;
-          setCurrentTemplate(templateId);
-        };
-
         // 執行腳本中的每個步驟
         for (let stepIndex = 0; stepIndex < autoPlayScript.length; stepIndex++) {
-          if (!isAutoPlaying) break; // 檢查是否被中止
+          if (!isAutoPlayingRef.current || !playbackControlRef.current.shouldContinue) break; // 檢查是否被中止
 
           setCurrentAutoPlayStep(stepIndex);
           const step = autoPlayScript[stepIndex];
@@ -6130,7 +6146,7 @@ ${cleanText}
           }
         }
         
-      } while (isAutoPlaying && (autoPlayMode === 'loop' || cardIndex < cards.length));
+      } while (isAutoPlayingRef.current && playbackControlRef.current.shouldContinue && (autoPlayMode === 'loop' || cardIndex < cards.length));
       
       console.log('自動播放完成');
       
@@ -6138,15 +6154,19 @@ ${cleanText}
       console.error('自動播放錯誤:', error);
       alert('自動播放發生錯誤: ' + error.message);
     } finally {
+      isAutoPlayingRef.current = false;
+      playbackControlRef.current.shouldContinue = false;
       setIsAutoPlaying(false);
       setCurrentAutoPlayCard(0);
       setCurrentAutoPlayStep(0);
       setCurrentView('folder'); // 播放結束後回到資料夾視圖
     }
-  }, [currentFolder, autoPlayScript, autoPlayMode, isAutoPlaying, executeAutoPlayStep, currentTemplate]);
+  }, [currentFolder, autoPlayScript, autoPlayMode, executeAutoPlayStep]);
 
   // 停止自動播放
   const stopAutoPlay = useCallback(() => {
+    isAutoPlayingRef.current = false;
+    playbackControlRef.current.shouldContinue = false;
     setIsAutoPlaying(false);
     setCurrentView('folder'); // 回到資料夾視圖
     // 停止語音播放
@@ -6175,8 +6195,14 @@ ${cleanText}
       return;
     }
 
+    if (isAutoPlayingRef.current) {
+      return;
+    }
+
     console.log(`開始播放 ${selectedSubFolders.length} 個子資料夾,共 ${selectedCards.length} 張卡片`);
 
+    isAutoPlayingRef.current = true;
+    playbackControlRef.current.shouldContinue = true;
     setIsAutoPlaying(true);
     setCurrentAutoPlayCard(0);
     setCurrentAutoPlayStep(0);
@@ -6194,7 +6220,7 @@ ${cleanText}
 
         // 執行腳本中的每個步驟
         for (let stepIndex = 0; stepIndex < autoPlayScript.length; stepIndex++) {
-          if (!isAutoPlaying) break;
+          if (!isAutoPlayingRef.current || !playbackControlRef.current.shouldContinue) break;
 
           setCurrentAutoPlayStep(stepIndex);
           const step = autoPlayScript[stepIndex];
@@ -6212,7 +6238,7 @@ ${cleanText}
           }
         }
 
-      } while (isAutoPlaying && (autoPlayMode === 'loop' || cardIndex < selectedCards.length));
+      } while (isAutoPlayingRef.current && playbackControlRef.current.shouldContinue && (autoPlayMode === 'loop' || cardIndex < selectedCards.length));
 
       console.log('子資料夾播放完成');
 
@@ -6220,12 +6246,14 @@ ${cleanText}
       console.error('子資料夾播放錯誤:', error);
       alert('播放發生錯誤: ' + error.message);
     } finally {
+      isAutoPlayingRef.current = false;
+      playbackControlRef.current.shouldContinue = false;
       setIsAutoPlaying(false);
       setCurrentAutoPlayCard(0);
       setCurrentAutoPlayStep(0);
       setCurrentView('folder');
     }
-  }, [currentFolder, selectedSubFolders, autoPlayScript, autoPlayMode, isAutoPlaying, executeAutoPlayStep]);
+  }, [currentFolder, selectedSubFolders, autoPlayScript, autoPlayMode, executeAutoPlayStep]);
 
   // 隨機播放功能
   const startRandomPlayback = useCallback(async () => {
@@ -6314,7 +6342,7 @@ ${cleanText}
               title="建立子資料夾"
               style={{
                 ...styles.button,
-                backgroundColor: currentFolder.cards.length === 0 ? '#d1d5db' : '#8b5cf6',
+                backgroundColor: currentFolder.cards.length === 0 ? 'var(--border)' : '#8b5cf6',
                 minWidth: isMobile ? '44px' : '50px',
                 padding: isMobile ? '12px' : '10px 16px',
                 fontSize: isMobile ? '22px' : '20px',
@@ -6342,7 +6370,7 @@ ${cleanText}
               title="新增照片錄音卡片"
               style={{
                 ...styles.button,
-                backgroundColor: '#10b981',
+                backgroundColor: 'var(--success)',
                 minWidth: isMobile ? '44px' : '50px',
                 padding: isMobile ? '12px' : '10px 16px',
                 fontSize: isMobile ? '22px' : '20px',
@@ -6362,7 +6390,7 @@ ${cleanText}
               title="開始學習"
               style={{
                 ...styles.button,
-                backgroundColor: currentFolder.cards.length === 0 ? '#d1d5db' : '#2563eb',
+                backgroundColor: currentFolder.cards.length === 0 ? 'var(--border)' : '#2563eb',
                 minWidth: isMobile ? '44px' : '50px',
                 padding: isMobile ? '12px' : '10px 16px',
                 fontSize: isMobile ? '22px' : '20px',
@@ -6411,7 +6439,7 @@ ${cleanText}
               justifyContent: 'space-between',
               marginBottom: '16px'
             }}>
-              <h2 style={{ fontSize: '20px', fontWeight: '600', color: '#1f2937' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--ink)' }}>
                 📁 子資料夾 ({currentFolder.subFolders.length})
               </h2>
               <button
@@ -6427,9 +6455,9 @@ ${cleanText}
                   padding: '8px 16px',
                   fontSize: '14px',
                   borderRadius: '6px',
-                  border: '1px solid #e5e7eb',
-                  backgroundColor: 'white',
-                  color: '#4F46E5',
+                  border: '1px solid var(--border)',
+                  backgroundColor: 'var(--paper)',
+                  color: 'var(--accent)',
                   cursor: 'pointer',
                   fontWeight: '600'
                 }}
@@ -6458,8 +6486,8 @@ ${cleanText}
                     padding: '16px',
                     borderRadius: '10px',
                     border: selectedSubFolders.includes(subFolder.id)
-                      ? '3px solid #4F46E5'
-                      : '2px solid #e5e7eb',
+                      ? '3px solid var(--accent)'
+                      : '2px solid var(--border)',
                     backgroundColor: selectedSubFolders.includes(subFolder.id)
                       ? '#eef2ff'
                       : 'white',
@@ -6476,7 +6504,7 @@ ${cleanText}
                       width: '24px',
                       height: '24px',
                       borderRadius: '50%',
-                      backgroundColor: '#4F46E5',
+                      backgroundColor: 'var(--accent)',
                       color: 'white',
                       display: 'flex',
                       alignItems: 'center',
@@ -6487,10 +6515,10 @@ ${cleanText}
                       ✓
                     </div>
                   )}
-                  <div style={{ fontWeight: '600', color: '#1f2937', marginBottom: '4px' }}>
+                  <div style={{ fontWeight: '600', color: 'var(--ink)', marginBottom: '4px' }}>
                     {subFolder.name}
                   </div>
-                  <div style={{ fontSize: '14px', color: '#6b7280' }}>
+                  <div style={{ fontSize: '14px', color: 'var(--muted)' }}>
                     {subFolder.cards.length} 張卡片
                   </div>
                 </div>
@@ -6506,7 +6534,7 @@ ${cleanText}
                   }}
                   style={{
                     ...styles.button,
-                    backgroundColor: '#10b981'
+                    backgroundColor: 'var(--success)'
                   }}
                 >
                   🎭 播放選中的子資料夾 ({selectedSubFolders.length})
@@ -6539,8 +6567,8 @@ ${cleanText}
                   <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '5px' }}>
                     <KanjiWithFurigana text={displayText1} showFurigana={settings.showFurigana} />
                   </h3>
-                  {displayText2 && <p style={{ color: '#6b7280' }}>{displayText2}</p>}
-                  {displayText3 && <p style={{ fontSize: '12px', color: '#9ca3af' }}>{displayText3}</p>}
+                  {displayText2 && <p style={{ color: 'var(--muted)' }}>{displayText2}</p>}
+                  {displayText3 && <p style={{ fontSize: '12px', color: 'var(--muted-2)' }}>{displayText3}</p>}
                 </div>
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <button
@@ -6571,8 +6599,8 @@ ${cleanText}
         {currentFolder.cards.length === 0 && (
           <div style={{ textAlign: 'center', padding: '60px 20px' }}>
             <div style={{ fontSize: '48px', marginBottom: '20px' }}>○</div>
-            <p style={{ color: '#6b7280', fontSize: '18px' }}>這個資料夾還沒有任何卡片</p>
-            <p style={{ color: '#9ca3af' }}>點擊「試算表編輯」開始添加日文單字！</p>
+            <p style={{ color: 'var(--muted)', fontSize: '18px' }}>這個資料夾還沒有任何卡片</p>
+            <p style={{ color: 'var(--muted-2)' }}>點擊「試算表編輯」開始添加日文單字！</p>
           </div>
         )}
 
@@ -6750,7 +6778,7 @@ ${cleanText}
         
         syncModal.innerHTML = `
           <div style="background: white; padding: 30px; border-radius: 15px; max-width: 500px; width: 90%;">
-            <h3 style="margin-top: 0; color: #1a1a1a;">☁️ 選擇同步方式</h3>
+            <h3 style="margin-top: 0; color: var(--ink);">☁️ 選擇同步方式</h3>
             
             <button onclick="
               const data = ${JSON.stringify(fullData)};
@@ -6764,7 +6792,7 @@ ${cleanText}
               this.parentElement.parentElement.remove();
               alert('✅ 備份文件已下載！\\n請上傳到 Google Drive、Dropbox 或其他雲端硬碟');
             " style="
-              width: 100%; padding: 15px; margin: 10px 0; background: #10B981; 
+              width: 100%; padding: 15px; margin: 10px 0; background: var(--success); 
               color: white; border: none; border-radius: 10px; font-size: 16px; cursor: pointer;
             ">
               💾 下載到雲端硬碟
@@ -6776,7 +6804,7 @@ ${cleanText}
                 this.parentElement.parentElement.remove();
               });
             " style="
-              width: 100%; padding: 15px; margin: 10px 0; background: #4F46E5; 
+              width: 100%; padding: 15px; margin: 10px 0; background: var(--accent); 
               color: white; border: none; border-radius: 10px; font-size: 16px; cursor: pointer;
             ">
               📋 複製同步碼（12位）
@@ -6801,8 +6829,8 @@ ${cleanText}
 
     return (
       <div style={{
-        padding: '32px 24px',
-        maxWidth: '1200px',
+        padding: '24px 20px',
+        maxWidth: '1160px',
         margin: '0 auto',
         position: 'relative'
       }}>
@@ -6817,12 +6845,12 @@ ${cleanText}
             backgroundColor:
               syncStatus === 'syncing' ? '#FEF3C7' :
               syncStatus === 'success' ? '#D1FAE5' :
-              syncStatus === 'error' ? '#FEE2E2' :
-              '#F3F4F6',
+              syncStatus === 'error' ? 'var(--danger-bg)' :
+              'var(--paper)',
             border: `1px solid ${
               syncStatus === 'syncing' ? '#F59E0B' :
-              syncStatus === 'success' ? '#10B981' :
-              syncStatus === 'error' ? '#EF4444' :
+              syncStatus === 'success' ? 'var(--success)' :
+              syncStatus === 'error' ? 'var(--danger)' :
               '#D1D5DB'
             }`,
             display: 'flex',
@@ -6833,7 +6861,7 @@ ${cleanText}
             color:
               syncStatus === 'syncing' ? '#92400E' :
               syncStatus === 'success' ? '#065F46' :
-              syncStatus === 'error' ? '#991B1B' :
+              syncStatus === 'error' ? 'var(--danger-dark)' :
               '#6B7280',
             boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
             zIndex: 1000,
@@ -6880,35 +6908,33 @@ ${cleanText}
         )}
 
         <div style={{
-          textAlign: 'center',
-          marginBottom: '40px'
+          textAlign: 'left',
+          marginBottom: '28px'
         }}>
           <h1 style={{
             ...styles.header,
-            background: 'linear-gradient(135deg, #4F46E5, #7C3AED, #EC4899)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
+            color: 'var(--ink)',
             marginBottom: '6px',
-            fontSize: '12px',
-            fontWeight: '600'
+            fontSize: '28px',
+            fontWeight: '700',
+            justifyContent: 'flex-start'
           }}>
-            🇯🇵 日本語学習カード
+            日本語學習卡
           </h1>
           <p style={{
-            color: '#6B7280',
-            fontSize: '12px',
+            color: 'var(--muted)',
+            fontSize: '14px',
             margin: '0 0 16px 0',
             fontWeight: '400'
           }}>
-            智能語音閃卡，讓日語學習更有效率
+            管理資料夾、編輯卡片、播放腳本
           </p>
           
           <div style={{
             display: 'flex',
             flexDirection: isMobile ? 'column' : 'row',
-            gap: '12px',
-            justifyContent: 'center',
+            gap: '10px',
+            justifyContent: 'flex-start',
             flexWrap: isMobile ? 'nowrap' : 'wrap',
             maxWidth: isMobile ? '100%' : 'none'
           }}>
@@ -6921,7 +6947,9 @@ ${cleanText}
               }}
               style={{
                 ...styles.button,
-                backgroundColor: '#dc2626',
+                backgroundColor: 'var(--paper)',
+                color: 'var(--ink)',
+                border: '1px solid var(--border)',
                 position: 'relative',
                 cursor: 'pointer',
                 display: 'flex',
@@ -6934,13 +6962,13 @@ ${cleanText}
                 width: isMobile ? '100%' : 'auto'
               }}
             >
-              <span>⚙ 語音設定</span>
+              <span>語音設定</span>
               <span style={{
                 fontSize: '10px',
                 padding: '2px 6px',
                 borderRadius: '10px',
-                backgroundColor: 'rgba(255,255,255,0.2)',
-                color: 'white',
+                backgroundColor: 'var(--bg)',
+                color: 'var(--muted)',
                 pointerEvents: 'none'
               }}>
                 {settings.azureTTS.enabled && settings.azureTTS.subscriptionKey ? 'Azure' : '預設'}
@@ -6948,30 +6976,30 @@ ${cleanText}
             </button>
             <button
               onClick={() => setShowNewFolder(true)}
-              style={{ ...styles.button, flex: isMobile ? 1 : 'auto', width: isMobile ? '100%' : 'auto' }}
+              style={{ ...styles.button, backgroundColor: 'var(--paper)', color: 'var(--ink)', border: '1px solid var(--border)', flex: isMobile ? 1 : 'auto', width: isMobile ? '100%' : 'auto' }}
             >
-+ 新增資料夾
+              新增資料夾
             </button>
 
             <button
               onClick={exportAllData}
-              style={{ ...styles.button, backgroundColor: '#10B981', flex: isMobile ? 1 : 'auto', width: isMobile ? '100%' : 'auto' }}
+              style={{ ...styles.button, backgroundColor: 'var(--paper)', color: 'var(--ink)', border: '1px solid var(--border)', flex: isMobile ? 1 : 'auto', width: isMobile ? '100%' : 'auto' }}
             >
-              💾 下載備份
+              下載備份
             </button>
 
             <button
               onClick={() => document.getElementById('restoreInput').click()}
-              style={{ ...styles.button, backgroundColor: '#7C3AED', flex: isMobile ? 1 : 'auto', width: isMobile ? '100%' : 'auto' }}
+              style={{ ...styles.button, backgroundColor: 'var(--paper)', color: 'var(--ink)', border: '1px solid var(--border)', flex: isMobile ? 1 : 'auto', width: isMobile ? '100%' : 'auto' }}
             >
-              📱 恢復數據
+              恢復資料
             </button>
 
             <button
               onClick={() => setShowSyncDialog(true)}
-              style={{ ...styles.button, backgroundColor: '#FF6B35', flex: isMobile ? 1 : 'auto', width: isMobile ? '100%' : 'auto' }}
+              style={{ ...styles.button, backgroundColor: 'var(--ink)', border: '1px solid var(--ink)', color: 'white', flex: isMobile ? 1 : 'auto', width: isMobile ? '100%' : 'auto' }}
             >
-              ☁️ 雲端同步設定
+              雲端同步
             </button>
             
             <input
@@ -7010,58 +7038,42 @@ ${cleanText}
                 cursor: 'pointer',
                 position: 'relative',
                 overflow: 'hidden',
-                '&:hover': {
-                  transform: 'translateY(-2px)',
-                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.12)'
-                }
+                '&:hover': { borderColor: 'var(--accent-light)' }
               }}
               onClick={() => {
                 setCurrentFolder(folder);
                 setCurrentView('folder');
               }}
             >
-              {/* 背景漸層 */}
-              <div style={{
-                position: 'absolute',
-                top: 0,
-                right: 0,
-                width: '60px',
-                height: '60px',
-                background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
-                borderRadius: '0 16px 0 50px',
-                opacity: 0.1
-              }}></div>
-              
               <div style={{ position: 'relative', zIndex: 1 }}>
                 <div style={styles.flexBetween}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                     <div style={{
                       fontSize: '32px',
                       padding: '8px',
-                      borderRadius: '12px',
-                      background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
+                      borderRadius: '10px',
+                      backgroundColor: 'var(--bg)',
+                      border: '1px solid var(--border)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       minWidth: '48px',
                       height: '48px'
                     }}>
-                      <span style={{ filter: 'grayscale(100%) brightness(0) invert(1)' }}>
-                        {folder.icon}
-                      </span>
+                      {folder.icon}
                     </div>
                     <div>
                       <h3 style={{ 
                         fontSize: '18px', 
                         fontWeight: '600',
                         margin: 0,
-                        color: '#1a1a1a',
+                        color: 'var(--ink)',
                         letterSpacing: '-0.3px'
                       }}>
                         {folder.name}
                       </h3>
                       <p style={{ 
-                        color: '#6b7280', 
+                        color: 'var(--muted)', 
                         margin: '4px 0 0 0',
                         fontSize: '14px',
                         fontWeight: '400'
@@ -7076,18 +7088,21 @@ ${cleanText}
                       deleteFolder(folder.id);
                     }} 
                     style={{ 
-                      ...styles.buttonRed, 
-                      padding: '8px',
+                      backgroundColor: 'transparent',
+                      border: '1px solid var(--border)',
+                      color: 'var(--muted)',
+                      padding: '6px',
                       borderRadius: '8px',
-                      fontSize: '16px',
-                      minWidth: '36px',
-                      height: '36px',
+                      fontSize: '14px',
+                      minWidth: '32px',
+                      height: '32px',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center'
+                      justifyContent: 'center',
+                      cursor: 'pointer'
                     }}
                   >
-                    🗑
+                    刪
                   </button>
                 </div>
               </div>
@@ -7097,11 +7112,10 @@ ${cleanText}
                 position: 'absolute',
                 bottom: '16px',
                 right: '16px',
-                color: '#9CA3AF',
-                fontSize: '20px',
-                transform: 'rotate(-45deg)'
+                color: 'var(--muted-2)',
+                fontSize: '16px'
               }}>
-                ↗
+                →
               </div>
             </div>
           ))}
@@ -7111,36 +7125,31 @@ ${cleanText}
           <div style={{ 
             textAlign: 'center', 
             padding: '80px 20px',
-            background: 'linear-gradient(135deg, #f8fafc, #f1f5f9)',
-            borderRadius: '20px',
-            border: '1px solid #e2e8f0'
+            backgroundColor: 'var(--paper)',
+            borderRadius: '12px',
+            border: '1px solid var(--border)'
           }}>
             <div style={{ 
-              fontSize: '64px', 
-              marginBottom: '24px',
-              background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text'
+              fontSize: '42px', 
+              marginBottom: '12px'
             }}>
-              🇯🇵
+              -
             </div>
             <h3 style={{
-              fontSize: '24px',
+              fontSize: '22px',
               fontWeight: '600',
-              color: '#1a1a1a',
-              marginBottom: '12px',
-              letterSpacing: '-0.5px'
+              color: 'var(--ink)',
+              marginBottom: '12px'
             }}>
-              開始你的日語學習之旅
+              尚無資料夾
             </h3>
             <p style={{ 
-              color: '#6B7280', 
-              fontSize: '16px',
-              marginBottom: '32px',
+              color: 'var(--muted)', 
+              fontSize: '14px',
+              marginBottom: '24px',
               lineHeight: '1.6'
             }}>
-              創建你的第一個學習資料夾，享受智能語音閃卡帶來的高效學習體驗
+              建立第一個資料夾，開始整理你的單字卡
             </p>
           </div>
         )}
@@ -7184,7 +7193,7 @@ ${cleanText}
         >
           <div
             style={{
-              backgroundColor: 'white',
+              backgroundColor: 'var(--paper)',
               borderRadius: '12px',
               padding: '24px',
               maxWidth: '1600px',
@@ -7202,7 +7211,7 @@ ${cleanText}
                 <div style={{
                   display: 'flex',
                   gap: '5px',
-                  backgroundColor: '#f3f4f6',
+                  backgroundColor: 'var(--paper)',
                   borderRadius: '8px',
                   padding: '4px'
                 }}>
@@ -7214,7 +7223,7 @@ ${cleanText}
                       borderRadius: '6px',
                       border: 'none',
                       backgroundColor: cardDisplayMode === 'card' ? 'white' : 'transparent',
-                      color: cardDisplayMode === 'card' ? '#4F46E5' : '#6b7280',
+                      color: cardDisplayMode === 'card' ? 'var(--accent)' : 'var(--muted)',
                       cursor: 'pointer',
                       fontWeight: cardDisplayMode === 'card' ? '600' : '400',
                       boxShadow: cardDisplayMode === 'card' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
@@ -7231,7 +7240,7 @@ ${cleanText}
                       borderRadius: '6px',
                       border: 'none',
                       backgroundColor: cardDisplayMode === 'table' ? 'white' : 'transparent',
-                      color: cardDisplayMode === 'table' ? '#4F46E5' : '#6b7280',
+                      color: cardDisplayMode === 'table' ? 'var(--accent)' : 'var(--muted)',
                       cursor: 'pointer',
                       fontWeight: cardDisplayMode === 'table' ? '600' : '400',
                       boxShadow: cardDisplayMode === 'table' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
@@ -7250,9 +7259,9 @@ ${cleanText}
                     padding: '8px 16px',
                     fontSize: '14px',
                     borderRadius: '6px',
-                    border: designMode ? '2px solid #4F46E5' : '1px solid #d1d5db',
-                    backgroundColor: designMode ? '#4F46E5' : 'white',
-                    color: designMode ? 'white' : '#374151',
+                    border: designMode ? '2px solid var(--accent)' : '1px solid var(--border)',
+                    backgroundColor: designMode ? 'var(--accent)' : 'white',
+                    color: designMode ? 'white' : 'var(--ink)',
                     cursor: 'pointer',
                     fontWeight: designMode ? '600' : '400',
                     transition: 'all 0.2s'
@@ -7340,8 +7349,8 @@ ${cleanText}
                     padding: '8px 16px',
                     fontSize: '14px',
                     borderRadius: '6px',
-                    border: '1px solid #d1d5db',
-                    backgroundColor: '#6b7280',
+                    border: '1px solid var(--border)',
+                    backgroundColor: 'var(--muted)',
                     color: 'white',
                     cursor: 'pointer'
                   }}
@@ -7352,7 +7361,7 @@ ${cleanText}
             </div>
 
             {/* 分頁導航 */}
-            <div style={{ display: 'flex', borderBottom: '2px solid #e5e7eb', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', borderBottom: '2px solid var(--border)', marginBottom: '20px' }}>
               <button
                 onClick={() => setCurrentPlaySettingTab('script')}
                 style={{
@@ -7361,8 +7370,8 @@ ${cleanText}
                   fontWeight: 'bold',
                   border: 'none',
                   backgroundColor: 'transparent',
-                  color: currentPlaySettingTab === 'script' ? '#3b82f6' : '#6b7280',
-                  borderBottom: currentPlaySettingTab === 'script' ? '2px solid #3b82f6' : '2px solid transparent',
+                  color: currentPlaySettingTab === 'script' ? 'var(--accent)' : 'var(--muted)',
+                  borderBottom: currentPlaySettingTab === 'script' ? '2px solid var(--accent)' : '2px solid transparent',
                   cursor: 'pointer',
                   transition: 'all 0.2s'
                 }}
@@ -7377,8 +7386,8 @@ ${cleanText}
                   fontWeight: 'bold',
                   border: 'none',
                   backgroundColor: 'transparent',
-                  color: currentPlaySettingTab === 'pages' ? '#3b82f6' : '#6b7280',
-                  borderBottom: currentPlaySettingTab === 'pages' ? '2px solid #3b82f6' : '2px solid transparent',
+                  color: currentPlaySettingTab === 'pages' ? 'var(--accent)' : 'var(--muted)',
+                  borderBottom: currentPlaySettingTab === 'pages' ? '2px solid var(--accent)' : '2px solid transparent',
                   cursor: 'pointer',
                   transition: 'all 0.2s'
                 }}
@@ -7408,12 +7417,12 @@ ${cleanText}
                   <div style={{
                     flexShrink: 0,
                     paddingBottom: '15px',
-                    borderBottom: '2px solid #e5e7eb'
+                    borderBottom: '2px solid var(--border)'
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                      <h4 style={{ fontSize: '16px', fontWeight: 'bold', margin: 0, color: '#3b82f6' }}>📜 腳本設定</h4>
+                      <h4 style={{ fontSize: '16px', fontWeight: 'bold', margin: 0, color: 'var(--accent)' }}>📜 腳本設定</h4>
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <span style={{ fontSize: '13px', color: '#6b7280' }}>當前卡片:</span>
+                        <span style={{ fontSize: '13px', color: 'var(--muted)' }}>當前卡片:</span>
                         <select
                           value={editingCard?.id || ''}
                           onChange={(e) => {
@@ -7431,8 +7440,8 @@ ${cleanText}
                             padding: '6px 12px',
                             fontSize: '13px',
                             borderRadius: '6px',
-                            border: '1px solid #d1d5db',
-                            backgroundColor: 'white',
+                            border: '1px solid var(--border)',
+                            backgroundColor: 'var(--paper)',
                             cursor: 'pointer'
                           }}
                         >
@@ -7444,7 +7453,7 @@ ${cleanText}
                         </select>
                       </div>
                     </div>
-                    <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '12px', marginTop: '8px' }}>設定自動播放的腳本順序：顯示頁面 + 語音播放 + 暫停時間</p>
+                    <p style={{ fontSize: '14px', color: 'var(--muted)', marginBottom: '12px', marginTop: '8px' }}>設定自動播放的腳本順序：顯示頁面 + 語音播放 + 暫停時間</p>
 
                     {/* 腳本列表切換 */}
                     <div style={{
@@ -7454,7 +7463,7 @@ ${cleanText}
                       marginBottom: '12px'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                        <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#374151' }}>腳本列表</span>
+                        <span style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--ink)' }}>腳本列表</span>
                         <button
                           onClick={() => {
                             const newPage = {
@@ -7475,7 +7484,7 @@ ${cleanText}
                             fontSize: '12px',
                             borderRadius: '4px',
                             border: 'none',
-                            backgroundColor: '#10b981',
+                            backgroundColor: 'var(--success)',
                             color: 'white',
                             cursor: 'pointer'
                           }}
@@ -7501,9 +7510,9 @@ ${cleanText}
                                   padding: '6px 12px',
                                   fontSize: '12px',
                                   borderRadius: '6px',
-                                  border: '2px solid #3b82f6',
+                                  border: '2px solid var(--accent)',
                                   backgroundColor: '#dbeafe',
-                                  color: '#1e40af',
+                                  color: 'var(--accent-dark)',
                                   fontWeight: 'bold',
                                   minWidth: '100px',
                                   outline: 'none'
@@ -7516,9 +7525,9 @@ ${cleanText}
                                   padding: '6px 12px',
                                   fontSize: '12px',
                                   borderRadius: '6px',
-                                  border: '1px solid #d1d5db',
-                                  backgroundColor: 'white',
-                                  color: '#374151',
+                                  border: '1px solid var(--border)',
+                                  backgroundColor: 'var(--paper)',
+                                  color: 'var(--ink)',
                                   cursor: 'pointer',
                                   fontWeight: 'normal'
                                 }}
@@ -7544,7 +7553,7 @@ ${cleanText}
                                   borderRadius: '4px',
                                   border: 'none',
                                   backgroundColor: '#fee2e2',
-                                  color: '#dc2626',
+                                  color: 'var(--danger)',
                                   cursor: 'pointer'
                                 }}
                                 title={`刪除「${page.name}」`}
@@ -7571,18 +7580,18 @@ ${cleanText}
                     {/* 左側：可滾動的腳本編輯區域 */}
                     <div style={{
                       overflowY: 'auto',
-                      border: '1px solid #e5e7eb',
+                      border: '1px solid var(--border)',
                       borderRadius: '6px',
                       padding: '15px',
                       minHeight: 0,
-                      backgroundColor: '#fafafa'
+                      backgroundColor: 'var(--bg)'
                     }}>
                       <div style={{ marginBottom: '12px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                          <h5 style={{ fontSize: '14px', fontWeight: 'bold', margin: 0, color: '#374151' }}>
+                          <h5 style={{ fontSize: '14px', fontWeight: 'bold', margin: 0, color: 'var(--ink)' }}>
                             {editingCard.pages[editingScriptIndex]?.name || '腳本'} - 步驟列表
                           </h5>
-                          <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                          <span style={{ fontSize: '12px', color: 'var(--muted)' }}>
                             💡 可拖曳 ⋮⋮ 符號調整順序
                           </span>
                         </div>
@@ -7603,9 +7612,9 @@ ${cleanText}
                           style={{
                             marginBottom: '15px',
                             padding: '15px',
-                            backgroundColor: 'white',
+                            backgroundColor: 'var(--paper)',
                             borderRadius: '8px',
-                            border: '1px solid #d1d5db',
+                            border: '1px solid var(--border)',
                             cursor: 'move',
                             position: 'relative',
                             boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
@@ -7617,7 +7626,7 @@ ${cleanText}
                             left: '8px',
                             top: '50%',
                             transform: 'translateY(-50%)',
-                            color: '#9ca3af',
+                            color: 'var(--muted-2)',
                             fontSize: '16px',
                             cursor: 'grab'
                           }}>
@@ -7629,7 +7638,7 @@ ${cleanText}
                             {step.type === 'display' && (
                               <div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                                  <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#1f2937' }}>📱 顯示模板</span>
+                                  <span style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--ink)' }}>📱 顯示模板</span>
                                   <select
                                     value={step.templateId || 'A'}
                                     onChange={(e) => {
@@ -7643,7 +7652,7 @@ ${cleanText}
                                       fontSize: '12px',
                                       padding: '6px 12px',
                                       borderRadius: '4px',
-                                      border: '1px solid #d1d5db',
+                                      border: '1px solid var(--border)',
                                       backgroundColor: '#f8f9fa',
                                       minWidth: '120px'
                                     }}
@@ -7665,7 +7674,7 @@ ${cleanText}
                                       fontSize: '12px',
                                       padding: '6px 10px',
                                       backgroundColor: '#fee2e2',
-                                      color: '#dc2626',
+                                      color: 'var(--danger)',
                                       border: 'none',
                                       borderRadius: '4px',
                                       cursor: 'pointer'
@@ -7680,14 +7689,14 @@ ${cleanText}
                             {step.type === 'speak' && (
                               <div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                                  <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#1f2937' }}>🎵 語音播放</span>
+                                  <span style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--ink)' }}>🎵 語音播放</span>
                                   <button
                                     onClick={() => updateCurrentScript(script => script.filter((_, i) => i !== index))}
                                     style={{
                                       fontSize: '12px',
                                       padding: '6px 10px',
                                       backgroundColor: '#fee2e2',
-                                      color: '#dc2626',
+                                      color: 'var(--danger)',
                                       border: 'none',
                                       borderRadius: '4px',
                                       cursor: 'pointer'
@@ -7700,7 +7709,7 @@ ${cleanText}
                                 {/* 第一行：基本設定 */}
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                                   <div>
-                                    <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>播放欄位</label>
+                                    <label style={{ fontSize: '12px', color: 'var(--muted)', display: 'block', marginBottom: '4px' }}>播放欄位</label>
                                     <select
                                       value={step.field || 'kanji'}
                                       onChange={(e) => updateCurrentScript(script => {
@@ -7713,8 +7722,8 @@ ${cleanText}
                                         fontSize: '12px',
                                         padding: '6px',
                                         borderRadius: '4px',
-                                        border: '1px solid #d1d5db',
-                                        backgroundColor: 'white'
+                                        border: '1px solid var(--border)',
+                                        backgroundColor: 'var(--paper)'
                                       }}
                                     >
                                       {Object.entries(getCurrentFields()).map(([key, field]) => (
@@ -7723,7 +7732,7 @@ ${cleanText}
                                     </select>
                                   </div>
                                   <div>
-                                    <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>重複次數</label>
+                                    <label style={{ fontSize: '12px', color: 'var(--muted)', display: 'block', marginBottom: '4px' }}>重複次數</label>
                                     <input
                                       type="number"
                                       min="1"
@@ -7734,11 +7743,11 @@ ${cleanText}
                                         newScript[index] = { ...step, repeat: parseInt(e.target.value) };
                                         return newScript;
                                       })}
-                                      style={{ width: '100%', fontSize: '12px', padding: '6px', borderRadius: '4px', border: '1px solid #d1d5db' }}
+                                      style={{ width: '100%', fontSize: '12px', padding: '6px', borderRadius: '4px', border: '1px solid var(--border)' }}
                                     />
                                   </div>
                                   <div>
-                                    <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>語速</label>
+                                    <label style={{ fontSize: '12px', color: 'var(--muted)', display: 'block', marginBottom: '4px' }}>語速</label>
                                     <input
                                       type="number"
                                       step="0.1"
@@ -7750,7 +7759,7 @@ ${cleanText}
                                         newScript[index] = { ...step, rate: parseFloat(e.target.value) };
                                         return newScript;
                                       })}
-                                      style={{ width: '100%', fontSize: '12px', padding: '6px', borderRadius: '4px', border: '1px solid #d1d5db' }}
+                                      style={{ width: '100%', fontSize: '12px', padding: '6px', borderRadius: '4px', border: '1px solid var(--border)' }}
                                     />
                                   </div>
                                 </div>
@@ -7758,7 +7767,7 @@ ${cleanText}
                                 {/* 第二行：暫停設定 */}
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                   <div>
-                                    <label style={{ fontSize: '12px', color: '#6b7280', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>⏱️ 暫停方式</label>
+                                    <label style={{ fontSize: '12px', color: 'var(--muted)', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>⏱️ 暫停方式</label>
                                     <select
                                       value={step.pauseMode || 'sentence'}
                                       onChange={(e) => updateCurrentScript(script => {
@@ -7771,7 +7780,7 @@ ${cleanText}
                                         fontSize: '12px',
                                         padding: '6px',
                                         borderRadius: '4px',
-                                        border: '2px solid #10b981',
+                                        border: '2px solid var(--success)',
                                         backgroundColor: '#f0fdf4'
                                       }}
                                     >
@@ -7782,7 +7791,7 @@ ${cleanText}
                                   <div>
                                     {step.pauseMode === 'sentence' ? (
                                       <>
-                                        <label style={{ fontSize: '12px', color: '#6b7280', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>📏 句長倍速</label>
+                                        <label style={{ fontSize: '12px', color: 'var(--muted)', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>📏 句長倍速</label>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                           <button
                                             onClick={() => updateCurrentScript(script => {
@@ -7797,10 +7806,10 @@ ${cleanText}
                                               padding: '6px 10px',
                                               fontSize: '14px',
                                               borderRadius: '4px',
-                                              border: '1px solid #d1d5db',
-                                              backgroundColor: (step.sentenceMultiplier || 1.0) <= 0.5 ? '#f3f4f6' : 'white',
+                                              border: '1px solid var(--border)',
+                                              backgroundColor: (step.sentenceMultiplier || 1.0) <= 0.5 ? 'var(--paper)' : 'white',
                                               cursor: (step.sentenceMultiplier || 1.0) <= 0.5 ? 'not-allowed' : 'pointer',
-                                              color: (step.sentenceMultiplier || 1.0) <= 0.5 ? '#9ca3af' : '#374151'
+                                              color: (step.sentenceMultiplier || 1.0) <= 0.5 ? 'var(--muted-2)' : 'var(--ink)'
                                             }}
                                           >
                                             −
@@ -7812,9 +7821,9 @@ ${cleanText}
                                             fontWeight: 'bold',
                                             padding: '6px',
                                             borderRadius: '4px',
-                                            border: '2px solid #3b82f6',
+                                            border: '2px solid var(--accent)',
                                             backgroundColor: '#eff6ff',
-                                            color: '#1e40af'
+                                            color: 'var(--accent-dark)'
                                           }}>
                                             {(step.sentenceMultiplier || 1.0).toFixed(1)}x
                                           </div>
@@ -7831,10 +7840,10 @@ ${cleanText}
                                               padding: '6px 10px',
                                               fontSize: '14px',
                                               borderRadius: '4px',
-                                              border: '1px solid #d1d5db',
-                                              backgroundColor: (step.sentenceMultiplier || 1.0) >= 3.0 ? '#f3f4f6' : 'white',
+                                              border: '1px solid var(--border)',
+                                              backgroundColor: (step.sentenceMultiplier || 1.0) >= 3.0 ? 'var(--paper)' : 'white',
                                               cursor: (step.sentenceMultiplier || 1.0) >= 3.0 ? 'not-allowed' : 'pointer',
-                                              color: (step.sentenceMultiplier || 1.0) >= 3.0 ? '#9ca3af' : '#374151'
+                                              color: (step.sentenceMultiplier || 1.0) >= 3.0 ? 'var(--muted-2)' : 'var(--ink)'
                                             }}
                                           >
                                             +
@@ -7843,7 +7852,7 @@ ${cleanText}
                                       </>
                                     ) : (
                                       <>
-                                        <label style={{ fontSize: '12px', color: '#6b7280', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>⏰ 固定暫停時間(毫秒)</label>
+                                        <label style={{ fontSize: '12px', color: 'var(--muted)', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>⏰ 固定暫停時間(毫秒)</label>
                                         <input
                                           type="number"
                                           placeholder="毫秒"
@@ -7872,14 +7881,14 @@ ${cleanText}
                             {step.type === 'pause' && (
                               <div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                                  <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#1f2937' }}>⏸️ 靜音暫停</span>
+                                  <span style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--ink)' }}>⏸️ 靜音暫停</span>
                                   <button
                                     onClick={() => updateCurrentScript(script => script.filter((_, i) => i !== index))}
                                     style={{
                                       fontSize: '12px',
                                       padding: '6px 10px',
                                       backgroundColor: '#fee2e2',
-                                      color: '#dc2626',
+                                      color: 'var(--danger)',
                                       border: 'none',
                                       borderRadius: '4px',
                                       cursor: 'pointer'
@@ -7888,7 +7897,7 @@ ${cleanText}
                                     🗑️ 刪除
                                   </button>
                                 </div>
-                                <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>暫停時間(毫秒)</label>
+                                <label style={{ fontSize: '12px', color: 'var(--muted)', display: 'block', marginBottom: '4px' }}>暫停時間(毫秒)</label>
                                 <input
                                   type="number"
                                   value={step.duration || 1000}
@@ -7897,7 +7906,7 @@ ${cleanText}
                                     newScript[index] = { ...step, duration: parseInt(e.target.value) };
                                     return newScript;
                                   })}
-                                  style={{ width: '100%', fontSize: '12px', padding: '6px', borderRadius: '4px', border: '1px solid #d1d5db' }}
+                                  style={{ width: '100%', fontSize: '12px', padding: '6px', borderRadius: '4px', border: '1px solid var(--border)' }}
                                 />
                               </div>
                             )}
@@ -7909,13 +7918,13 @@ ${cleanText}
                     {/* 右側：播放預覽 */}
                     <div style={{
                       overflowY: 'auto',
-                      border: '1px solid #e5e7eb',
+                      border: '1px solid var(--border)',
                       borderRadius: '6px',
                       padding: '15px',
                       backgroundColor: '#f8fafc',
                       minHeight: 0
                     }}>
-                      <h5 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', color: '#374151', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <h5 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', color: 'var(--ink)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span>📺</span>
                         播放預覽
                       </h5>
@@ -7928,10 +7937,10 @@ ${cleanText}
                         marginBottom: '15px',
                         border: '1px solid #bfdbfe'
                       }}>
-                        <div style={{ fontSize: '12px', color: '#1e40af', marginBottom: '6px' }}>
+                        <div style={{ fontSize: '12px', color: 'var(--accent-dark)', marginBottom: '6px' }}>
                           <strong>📋 順序播放模式</strong>
                         </div>
-                        <div style={{ fontSize: '11px', color: '#3b82f6' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--accent)' }}>
                           共 {editingCard.pages[editingScriptIndex]?.script?.length || 0} 個步驟 • 預計每張卡約 {Math.ceil((editingCard.pages[editingScriptIndex]?.script?.length || 0) * 2)} 秒
                         </div>
                       </div>
@@ -7941,7 +7950,7 @@ ${cleanText}
                         fontSize: '13px',
                         fontWeight: 'bold',
                         marginBottom: '10px',
-                        color: '#059669',
+                        color: 'var(--success)',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px'
@@ -7956,9 +7965,9 @@ ${cleanText}
                             key={step.id}
                             style={{
                               padding: '10px 12px',
-                              backgroundColor: 'white',
+                              backgroundColor: 'var(--paper)',
                               borderRadius: '6px',
-                              border: '1px solid #e5e7eb',
+                              border: '1px solid var(--border)',
                               fontSize: '12px',
                               boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
                             }}
@@ -7968,7 +7977,7 @@ ${cleanText}
                                 width: '20px',
                                 height: '20px',
                                 borderRadius: '50%',
-                                backgroundColor: '#3b82f6',
+                                backgroundColor: 'var(--accent)',
                                 color: 'white',
                                 fontSize: '11px',
                                 fontWeight: 'bold',
@@ -7979,13 +7988,13 @@ ${cleanText}
                               }}>
                                 {index + 1}
                               </span>
-                              <span style={{ fontWeight: 'bold', color: '#374151' }}>
+                              <span style={{ fontWeight: 'bold', color: 'var(--ink)' }}>
                                 {step.type === 'display' && '📱 顯示模板'}
                                 {step.type === 'speak' && '🎵 語音播放'}
                                 {step.type === 'pause' && '⏸️ 暫停'}
                               </span>
                             </div>
-                            <div style={{ marginLeft: '28px', color: '#6b7280', fontSize: '11px' }}>
+                            <div style={{ marginLeft: '28px', color: 'var(--muted)', fontSize: '11px' }}>
                               {step.type === 'display' && `模板 ${step.templateId}`}
                               {step.type === 'speak' && (
                                 <>
@@ -8009,11 +8018,11 @@ ${cleanText}
                         <div style={{
                           padding: '30px',
                           textAlign: 'center',
-                          color: '#9ca3af',
+                          color: 'var(--muted-2)',
                           fontSize: '13px',
-                          border: '2px dashed #d1d5db',
+                          border: '2px dashed var(--border)',
                           borderRadius: '8px',
-                          backgroundColor: 'white'
+                          backgroundColor: 'var(--paper)'
                         }}>
                           尚未新增任何步驟<br/>
                           點擊下方按鈕開始建立腳本
@@ -8023,7 +8032,7 @@ ${cleanText}
                   </div>
 
                   {/* 固定底部：添加步驟按鈕 */}
-                  <div style={{ flexShrink: 0, paddingTop: '15px', borderTop: '2px solid #e5e7eb' }}>
+                  <div style={{ flexShrink: 0, paddingTop: '15px', borderTop: '2px solid var(--border)' }}>
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button
                         onClick={() => updateCurrentScript(script => [...script, {
@@ -8036,9 +8045,9 @@ ${cleanText}
                           padding: '10px 12px',
                           fontSize: '13px',
                           borderRadius: '6px',
-                          border: '1px solid #3b82f6',
-                          backgroundColor: 'white',
-                          color: '#3b82f6',
+                          border: '1px solid var(--accent)',
+                          backgroundColor: 'var(--paper)',
+                          color: 'var(--accent)',
                           cursor: 'pointer',
                           fontWeight: '500'
                         }}
@@ -8061,9 +8070,9 @@ ${cleanText}
                           padding: '10px 12px',
                           fontSize: '13px',
                           borderRadius: '6px',
-                          border: '1px solid #10b981',
-                          backgroundColor: 'white',
-                          color: '#10b981',
+                          border: '1px solid var(--success)',
+                          backgroundColor: 'var(--paper)',
+                          color: 'var(--success)',
                           cursor: 'pointer',
                           fontWeight: '500'
                         }}
@@ -8082,7 +8091,7 @@ ${cleanText}
                           fontSize: '13px',
                           borderRadius: '6px',
                           border: '1px solid #f59e0b',
-                          backgroundColor: 'white',
+                          backgroundColor: 'var(--paper)',
                           color: '#f59e0b',
                           cursor: 'pointer',
                           fontWeight: '500'
@@ -8097,12 +8106,48 @@ ${cleanText}
                   <div style={{
                     marginTop: 'auto',
                     padding: '20px 24px',
-                    backgroundColor: '#f8f9fa',
+                    backgroundColor: 'var(--paper)',
                     display: 'flex',
+                    flexDirection: 'column',
                     gap: '12px',
                     flexShrink: 0,
-                    borderTop: '1px solid #e5e7eb'
+                    borderTop: '1px solid var(--border)'
                   }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '12px', color: 'var(--muted)' }}>播放狀態</span>
+                        <span style={{
+                          padding: '4px 10px',
+                          borderRadius: '999px',
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          backgroundColor: (isPlaying || isAutoPlaying || isAutoPlayingAll) ? '#dcfce7' : '#e5e7eb',
+                          color: (isPlaying || isAutoPlaying || isAutoPlayingAll) ? '#15803d' : '#374151'
+                        }}>
+                          {(isPlaying || isAutoPlaying || isAutoPlayingAll) ? '播放中' : '待機'}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          stopPlayback();
+                          stopAutoPlay();
+                        }}
+                        disabled={!isPlaying && !isAutoPlaying && !isAutoPlayingAll}
+                        style={{
+                          padding: '8px 14px',
+                          fontSize: '13px',
+                          fontWeight: '700',
+                          borderRadius: '8px',
+                          border: '1px solid #fecaca',
+                          backgroundColor: (!isPlaying && !isAutoPlaying && !isAutoPlayingAll) ? '#f3f4f6' : '#fff1f2',
+                          color: (!isPlaying && !isAutoPlaying && !isAutoPlayingAll) ? '#9ca3af' : '#be123c',
+                          cursor: (!isPlaying && !isAutoPlaying && !isAutoPlayingAll) ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        ⏹ 停止
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', gap: '12px' }}>
                     <button
                       onClick={async () => {
                         if (editingCard && editingCard.pages[editingScriptIndex]) {
@@ -8125,7 +8170,7 @@ ${cleanText}
                         opacity: (!editingCard || !editingCard.pages[editingScriptIndex]) ? 0.5 : 1
                       }}
                     >
-                      🎮 測試播放此腳本
+                      {isPlaying ? '🔊 測試播放中...' : '🎮 測試播放此腳本'}
                     </button>
                     <button
                       onClick={() => {
@@ -8142,14 +8187,15 @@ ${cleanText}
                         fontWeight: 'bold',
                         borderRadius: '8px',
                         border: 'none',
-                        backgroundColor: '#dc2626',
+                        backgroundColor: 'var(--danger)',
                         color: 'white',
                         cursor: 'pointer',
                         opacity: !currentFolder?.cards?.length ? 0.5 : 1
                       }}
                     >
-                      🎭 開始自動播放
+                      {isAutoPlaying ? '🎭 自動播放中...' : '🎭 開始自動播放'}
                     </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -8164,8 +8210,8 @@ ${cleanText}
                 }}>
                   {/* 固定頭部區域 */}
                   <div style={{ flexShrink: 0 }}>
-                    <h4 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '10px', color: '#3b82f6' }}>📱 頁面設定</h4>
-                    <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '15px' }}>設定5種頁面模板（A、B、C、D、E），每種模板可自訂顯示的欄位</p>
+                    <h4 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '10px', color: 'var(--accent)' }}>📱 頁面設定</h4>
+                    <p style={{ fontSize: '14px', color: 'var(--muted)', marginBottom: '15px' }}>設定5種頁面模板（A、B、C、D、E），每種模板可自訂顯示的欄位</p>
 
                     {/* 模板選擇器 */}
                     <div style={{ display: 'flex', gap: '8px', marginBottom: '15px', flexWrap: 'wrap' }}>
@@ -8178,9 +8224,9 @@ ${cleanText}
                             fontSize: '14px',
                             fontWeight: selectedTemplateForEdit === templateId ? 'bold' : 'normal',
                             borderRadius: '6px',
-                            border: selectedTemplateForEdit === templateId ? '2px solid #3b82f6' : '1px solid #d1d5db',
+                            border: selectedTemplateForEdit === templateId ? '2px solid var(--accent)' : '1px solid var(--border)',
                             backgroundColor: selectedTemplateForEdit === templateId ? '#dbeafe' : 'white',
-                            color: selectedTemplateForEdit === templateId ? '#1e40af' : '#374151',
+                            color: selectedTemplateForEdit === templateId ? 'var(--accent-dark)' : 'var(--ink)',
                             cursor: 'pointer',
                             transition: 'all 0.2s'
                           }}
@@ -8195,7 +8241,7 @@ ${cleanText}
                   <div style={{
                     flex: 1,
                     overflowY: 'auto',
-                    border: '1px solid #e5e7eb',
+                    border: '1px solid var(--border)',
                     borderRadius: '6px',
                     padding: '20px',
                     backgroundColor: '#f8f9fa'
@@ -8204,7 +8250,7 @@ ${cleanText}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', height: '100%' }}>
                       {/* 左側：模板設定 */}
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <h4 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '15px', color: '#059669' }}>📋 模板設定</h4>
+                        <h4 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '15px', color: 'var(--success)' }}>📋 模板設定</h4>
                         <div style={{ flex: 1, overflowY: 'auto' }}>
                           {/* 只顯示選中的模板 */}
                           {(() => {
@@ -8214,13 +8260,13 @@ ${cleanText}
                             <div key={templateId} style={{ 
                               marginBottom: '20px', 
                               padding: '15px', 
-                              backgroundColor: 'white', 
+                              backgroundColor: 'var(--paper)', 
                               borderRadius: '8px',
-                              border: '1px solid #d1d5db',
+                              border: '1px solid var(--border)',
                               boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                             }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '15px' }}>
-                                <h4 style={{ fontSize: '16px', fontWeight: 'bold', minWidth: '60px', color: '#3b82f6' }}>模板{templateId}</h4>
+                                <h4 style={{ fontSize: '16px', fontWeight: 'bold', minWidth: '60px', color: 'var(--accent)' }}>模板{templateId}</h4>
                                 <input
                                   type="text"
                                   value={template.name}
@@ -8236,7 +8282,7 @@ ${cleanText}
                                   style={{ 
                                     flex: 1, 
                                     padding: '8px 12px', 
-                                    border: '1px solid #d1d5db', 
+                                    border: '1px solid var(--border)', 
                                     borderRadius: '4px',
                                     fontSize: '14px'
                                   }}
@@ -8246,8 +8292,8 @@ ${cleanText}
                               
                               <div style={{ marginBottom: '15px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                                  <label style={{ fontSize: '14px', fontWeight: '500', color: '#374151' }}>選擇欄位</label>
-                                  <div style={{ fontSize: '12px', color: '#6b7280' }}>（點擊選擇）</div>
+                                  <label style={{ fontSize: '14px', fontWeight: '500', color: 'var(--ink)' }}>選擇欄位</label>
+                                  <div style={{ fontSize: '12px', color: 'var(--muted)' }}>（點擊選擇）</div>
                                 </div>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                                   {Object.entries(getCurrentFields()).map(([fieldKey, fieldConfig]) => (
@@ -8256,11 +8302,11 @@ ${cleanText}
                                       alignItems: 'center', 
                                       gap: '6px',
                                       padding: '6px 10px',
-                                      backgroundColor: template.fields.includes(fieldKey) ? '#dbeafe' : '#f3f4f6',
+                                      backgroundColor: template.fields.includes(fieldKey) ? '#dbeafe' : 'var(--paper)',
                                       borderRadius: '4px',
                                       cursor: 'pointer',
                                       fontSize: '12px',
-                                      border: template.fields.includes(fieldKey) ? '1px solid #3b82f6' : '1px solid #d1d5db'
+                                      border: template.fields.includes(fieldKey) ? '1px solid var(--accent)' : '1px solid var(--border)'
                                     }}>
                                       <input
                                         type="checkbox"
@@ -8288,7 +8334,7 @@ ${cleanText}
                               {/* 欄位順序調整區 */}
                               {template.fields.length > 0 && (
                                 <div style={{ marginBottom: '15px', padding: '12px', backgroundColor: '#fef3c7', borderRadius: '6px', border: '1px solid #f59e0b' }}>
-                                  <div style={{ fontSize: '14px', fontWeight: '500', color: '#92400e', marginBottom: '8px' }}>
+                                  <div style={{ fontSize: '14px', fontWeight: '500', color: 'var(--accent-dark)', marginBottom: '8px' }}>
                                     📌 欄位顯示順序（拖曳調整）
                                   </div>
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -8307,14 +8353,14 @@ ${cleanText}
                                         onDragOver={(e) => {
                                           e.preventDefault();
                                           e.dataTransfer.dropEffect = 'move';
-                                          e.currentTarget.style.borderTop = '2px solid #3b82f6';
+                                          e.currentTarget.style.borderTop = '2px solid var(--accent)';
                                         }}
                                         onDragLeave={(e) => {
-                                          e.currentTarget.style.borderTop = '1px solid #e5e7eb';
+                                          e.currentTarget.style.borderTop = '1px solid var(--border)';
                                         }}
                                         onDrop={(e) => {
                                           e.preventDefault();
-                                          e.currentTarget.style.borderTop = '1px solid #e5e7eb';
+                                          e.currentTarget.style.borderTop = '1px solid var(--border)';
                                           const draggedFieldKey = e.dataTransfer.getData('text/html');
                                           if (draggedFieldKey === fieldKey) return;
 
@@ -8340,18 +8386,18 @@ ${cleanText}
                                           alignItems: 'center',
                                           gap: '10px',
                                           padding: '8px 12px',
-                                          backgroundColor: 'white',
+                                          backgroundColor: 'var(--paper)',
                                           borderRadius: '4px',
-                                          border: '1px solid #e5e7eb',
+                                          border: '1px solid var(--border)',
                                           cursor: 'grab',
                                           transition: 'all 0.2s'
                                         }}
                                       >
                                         <span style={{ fontSize: '16px' }}>☰</span>
-                                        <span style={{ fontSize: '13px', fontWeight: '500', color: '#374151', flex: 1 }}>
+                                        <span style={{ fontSize: '13px', fontWeight: '500', color: 'var(--ink)', flex: 1 }}>
                                           {getCurrentFields()[fieldKey]?.label || fieldKey}
                                         </span>
-                                        <span style={{ fontSize: '11px', color: '#9ca3af' }}>#{index + 1}</span>
+                                        <span style={{ fontSize: '11px', color: 'var(--muted-2)' }}>#{index + 1}</span>
                                       </div>
                                     ))}
                                   </div>
@@ -8360,8 +8406,8 @@ ${cleanText}
 
                               {/* 欄位樣式設定區 */}
                               {template.fields.length > 0 && (
-                                <div style={{ marginBottom: '15px', padding: '12px', backgroundColor: '#f9fafb', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
-                                  <div style={{ fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '10px' }}>欄位樣式設定</div>
+                                <div style={{ marginBottom: '15px', padding: '12px', backgroundColor: 'var(--paper)', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                                  <div style={{ fontSize: '14px', fontWeight: '500', color: 'var(--ink)', marginBottom: '10px' }}>欄位樣式設定</div>
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                     {template.fields.map(fieldKey => {
                                       const fieldStyle = template.fieldStyles[fieldKey] || {
@@ -8369,19 +8415,19 @@ ${cleanText}
                                         fontFamily: 'sans-serif',
                                         textAlign: 'center',
                                         lineHeight: 1.5,
-                                        color: '#000000'
+                                        color: 'var(--ink)'
                                       };
                                       const fieldConfig = getCurrentFields()[fieldKey];
                                       return (
-                                        <div key={fieldKey} style={{ padding: '10px', backgroundColor: 'white', borderRadius: '4px', border: '1px solid #e5e7eb' }}>
-                                          <div style={{ fontSize: '13px', fontWeight: '600', color: '#3b82f6', marginBottom: '8px' }}>
+                                        <div key={fieldKey} style={{ padding: '10px', backgroundColor: 'var(--paper)', borderRadius: '4px', border: '1px solid var(--border)' }}>
+                                          <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--accent)', marginBottom: '8px' }}>
                                             {fieldConfig?.label || fieldKey}
                                           </div>
 
                                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '10px' }}>
                                             {/* 字型大小 */}
                                             <div>
-                                              <label style={{ fontSize: '11px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>
+                                              <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '4px' }}>
                                                 字型大小：{fieldStyle.fontSize}px
                                               </label>
                                               <input
@@ -8410,7 +8456,7 @@ ${cleanText}
 
                                             {/* 字型選擇 */}
                                             <div>
-                                              <label style={{ fontSize: '11px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>字型</label>
+                                              <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '4px' }}>字型</label>
                                               <select
                                                 value={fieldStyle.fontFamily}
                                                 onChange={(e) => {
@@ -8428,7 +8474,7 @@ ${cleanText}
                                                     }
                                                   }));
                                                 }}
-                                                style={{ width: '100%', padding: '4px 6px', fontSize: '12px', border: '1px solid #d1d5db', borderRadius: '4px' }}
+                                                style={{ width: '100%', padding: '4px 6px', fontSize: '12px', border: '1px solid var(--border)', borderRadius: '4px' }}
                                               >
                                                 <option value="sans-serif">無襯線</option>
                                                 <option value="serif">襯線</option>
@@ -8439,7 +8485,7 @@ ${cleanText}
 
                                             {/* 對齊方式 */}
                                             <div>
-                                              <label style={{ fontSize: '11px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>對齊</label>
+                                              <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '4px' }}>對齊</label>
                                               <div style={{ display: 'flex', gap: '4px' }}>
                                                 {['left', 'center', 'right'].map(align => (
                                                   <button
@@ -8463,10 +8509,10 @@ ${cleanText}
                                                       flex: 1,
                                                       padding: '4px',
                                                       fontSize: '11px',
-                                                      border: '1px solid #d1d5db',
+                                                      border: '1px solid var(--border)',
                                                       borderRadius: '4px',
-                                                      backgroundColor: fieldStyle.textAlign === align ? '#3b82f6' : 'white',
-                                                      color: fieldStyle.textAlign === align ? 'white' : '#374151',
+                                                      backgroundColor: fieldStyle.textAlign === align ? 'var(--accent)' : 'white',
+                                                      color: fieldStyle.textAlign === align ? 'white' : 'var(--ink)',
                                                       cursor: 'pointer'
                                                     }}
                                                   >
@@ -8478,7 +8524,7 @@ ${cleanText}
 
                                             {/* 行間距 */}
                                             <div>
-                                              <label style={{ fontSize: '11px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>
+                                              <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '4px' }}>
                                                 行距：{(fieldStyle.lineHeight || 1.5).toFixed(1)}
                                               </label>
                                               <input
@@ -8508,10 +8554,10 @@ ${cleanText}
 
                                             {/* 顏色 */}
                                             <div>
-                                              <label style={{ fontSize: '11px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>顏色</label>
+                                              <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '4px' }}>顏色</label>
                                               <input
                                                 type="color"
-                                                value={fieldStyle.color || '#000000'}
+                                                value={fieldStyle.color || 'var(--ink)'}
                                                 onChange={(e) => {
                                                   setDisplayTemplates(prev => ({
                                                     ...prev,
@@ -8527,7 +8573,7 @@ ${cleanText}
                                                     }
                                                   }));
                                                 }}
-                                                style={{ width: '100%', height: '28px', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer' }}
+                                                style={{ width: '100%', height: '28px', border: '1px solid var(--border)', borderRadius: '4px', cursor: 'pointer' }}
                                               />
                                             </div>
                                           </div>
@@ -8540,7 +8586,7 @@ ${cleanText}
 
                               {/* 頁面頂部欄位設定 */}
                               <div style={{ marginBottom: '15px', padding: '12px', backgroundColor: '#fffbeb', borderRadius: '6px', border: '1px solid #fbbf24' }}>
-                                <div style={{ fontSize: '14px', fontWeight: '500', color: '#92400e', marginBottom: '8px' }}>
+                                <div style={{ fontSize: '14px', fontWeight: '500', color: 'var(--accent-dark)', marginBottom: '8px' }}>
                                   頁面頂部顯示欄位（最多3個）
                                 </div>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -8595,7 +8641,7 @@ ${cleanText}
                                   gap: '6px',
                                   fontSize: '14px',
                                   fontWeight: '500',
-                                  color: '#374151'
+                                  color: 'var(--ink)'
                                 }}>
                                   <input
                                     type="checkbox"
@@ -8621,7 +8667,7 @@ ${cleanText}
 
                       {/* 右側：預覽區域 */}
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <h4 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '15px', color: '#059669' }}>👀 模板預覽</h4>
+                        <h4 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '15px', color: 'var(--success)' }}>👀 模板預覽</h4>
                         <div style={{ flex: 1, overflowY: 'auto' }}>
                           {/* 只顯示選中的模板 */}
                           {(() => {
@@ -8631,13 +8677,13 @@ ${cleanText}
                             <div key={templateId} style={{
                               marginBottom: '15px',
                               padding: '15px',
-                              backgroundColor: 'white',
+                              backgroundColor: 'var(--paper)',
                               borderRadius: '8px',
-                              border: '1px solid #d1d5db',
+                              border: '1px solid var(--border)',
                               boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                             }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                                <h5 style={{ fontSize: '14px', fontWeight: 'bold', margin: 0, color: '#3b82f6' }}>
+                                <h5 style={{ fontSize: '14px', fontWeight: 'bold', margin: 0, color: 'var(--accent)' }}>
                                   模板{templateId}：{template.name}
                                 </h5>
                                 <button
@@ -8647,18 +8693,18 @@ ${cleanText}
                                     fontSize: '12px',
                                     borderRadius: '4px',
                                     border: 'none',
-                                    backgroundColor: currentTemplate === templateId ? '#16a34a' : '#f3f4f6',
-                                    color: currentTemplate === templateId ? 'white' : '#374151',
+                                    backgroundColor: currentTemplate === templateId ? '#16a34a' : 'var(--paper)',
+                                    color: currentTemplate === templateId ? 'white' : 'var(--ink)',
                                     cursor: 'pointer'
                                   }}
                                 >
                                   {currentTemplate === templateId ? '✓ 使用中' : '使用模板'}
                                 </button>
                               </div>
-                              <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}>
+                              <div style={{ fontSize: '12px', color: 'var(--muted)', marginBottom: '8px' }}>
                                 欄位：{template.fields.length > 0 ? template.fields.map(fieldKey => getCurrentFields()[fieldKey]?.label || fieldKey).join(' | ') : '無欄位'}
                                 {template.topFields && template.topFields.length > 0 && (
-                                  <div style={{ marginTop: '4px', color: '#92400e' }}>
+                                  <div style={{ marginTop: '4px', color: 'var(--accent-dark)' }}>
                                     頂部：{template.topFields.map(fieldKey => getCurrentFields()[fieldKey]?.label || fieldKey).join(', ')}
                                   </div>
                                 )}
@@ -8689,10 +8735,10 @@ ${cleanText}
 
                                         return (
                                           <div key={fieldKey} style={{ textAlign: 'center', flex: 1 }}>
-                                            <div style={{ fontSize: '9px', color: '#92400e', marginBottom: '2px' }}>
+                                            <div style={{ fontSize: '9px', color: 'var(--accent-dark)', marginBottom: '2px' }}>
                                               {field?.label || fieldKey}
                                             </div>
-                                            <div style={{ fontSize: '10px', color: '#78350f', fontWeight: '600' }}>
+                                            <div style={{ fontSize: '10px', color: 'var(--accent-dark)', fontWeight: '600' }}>
                                               {fieldValue.replace(/\[.*?\]/g, '')}
                                             </div>
                                           </div>

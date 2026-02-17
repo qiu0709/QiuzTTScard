@@ -159,7 +159,7 @@ const MediaCard = ({ card, onUpdate, onClose }) => {
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.5)',
+      backgroundColor: 'rgba(43, 39, 34, 0.45)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -167,20 +167,20 @@ const MediaCard = ({ card, onUpdate, onClose }) => {
       padding: '20px',
     },
     modal: {
-      backgroundColor: 'white',
+      backgroundColor: 'var(--paper)',
       borderRadius: '16px',
       padding: '24px',
       maxWidth: '600px',
       width: '100%',
       maxHeight: '90vh',
       overflow: 'auto',
-      boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
+      boxShadow: '0 16px 40px rgba(43, 39, 34, 0.18)',
     },
     header: {
       fontSize: '24px',
       fontWeight: 'bold',
       marginBottom: '20px',
-      color: '#1f2937',
+      color: 'var(--ink)',
     },
     section: {
       marginBottom: '24px',
@@ -190,26 +190,30 @@ const MediaCard = ({ card, onUpdate, onClose }) => {
       fontSize: '14px',
       fontWeight: '600',
       marginBottom: '8px',
-      color: '#374151',
+      color: 'var(--ink)',
     },
     input: {
       width: '100%',
       padding: '12px',
       fontSize: '16px',
-      border: '2px solid #e5e7eb',
-      borderRadius: '8px',
+      border: '1px solid var(--border)',
+      borderRadius: '10px',
       outline: 'none',
       transition: 'border-color 0.2s',
+      backgroundColor: 'var(--paper)',
+      color: 'var(--ink)',
     },
     textarea: {
       width: '100%',
       padding: '12px',
       fontSize: '16px',
-      border: '2px solid #e5e7eb',
-      borderRadius: '8px',
+      border: '1px solid var(--border)',
+      borderRadius: '10px',
       outline: 'none',
       minHeight: '100px',
       resize: 'vertical',
+      backgroundColor: 'var(--paper)',
+      color: 'var(--ink)',
     },
     button: {
       padding: '12px 24px',
@@ -219,19 +223,19 @@ const MediaCard = ({ card, onUpdate, onClose }) => {
       border: 'none',
       cursor: 'pointer',
       transition: 'all 0.2s',
-      backgroundColor: '#4F46E5',
+      backgroundColor: 'var(--accent)',
       color: 'white',
     },
     buttonSecondary: {
       padding: '12px 24px',
       fontSize: '16px',
       fontWeight: '600',
-      borderRadius: '8px',
-      border: '2px solid #e5e7eb',
+      borderRadius: '10px',
+      border: '1px solid var(--border)',
       cursor: 'pointer',
       transition: 'all 0.2s',
-      backgroundColor: 'white',
-      color: '#374151',
+      backgroundColor: 'var(--paper)',
+      color: 'var(--ink)',
     },
     buttonDanger: {
       padding: '8px 16px',
@@ -240,7 +244,7 @@ const MediaCard = ({ card, onUpdate, onClose }) => {
       borderRadius: '6px',
       border: 'none',
       cursor: 'pointer',
-      backgroundColor: '#EF4444',
+      backgroundColor: 'var(--danger)',
       color: 'white',
     },
     imagePreview: {
@@ -248,25 +252,25 @@ const MediaCard = ({ card, onUpdate, onClose }) => {
       maxHeight: '300px',
       objectFit: 'contain',
       borderRadius: '12px',
-      border: '2px solid #e5e7eb',
+      border: '1px solid var(--border)',
     },
     recordingIndicator: {
       display: 'inline-flex',
       alignItems: 'center',
       gap: '8px',
       padding: '8px 16px',
-      backgroundColor: '#FEE2E2',
+      backgroundColor: 'var(--danger-bg)',
       borderRadius: '20px',
       fontSize: '14px',
       fontWeight: '600',
-      color: '#991B1B',
+      color: 'var(--danger-dark)',
     },
     playbackControls: {
       display: 'flex',
       alignItems: 'center',
       gap: '12px',
       padding: '16px',
-      backgroundColor: '#F3F4F6',
+      backgroundColor: 'var(--paper)',
       borderRadius: '12px',
     },
   };
@@ -320,7 +324,7 @@ const MediaCard = ({ card, onUpdate, onClose }) => {
               <span style={{
                 width: '12px',
                 height: '12px',
-                backgroundColor: '#EF4444',
+                backgroundColor: 'var(--danger)',
                 borderRadius: '50%',
                 animation: 'pulse 1.5s infinite'
               }}></span>
@@ -336,7 +340,7 @@ const MediaCard = ({ card, onUpdate, onClose }) => {
             )}
 
             {isRecording && (
-              <button onClick={stopRecording} style={{ ...styles.button, backgroundColor: '#EF4444' }}>
+              <button onClick={stopRecording} style={{ ...styles.button, backgroundColor: 'var(--danger)' }}>
                 ⏹ 停止錄音
               </button>
             )}
@@ -376,7 +380,7 @@ const MediaCard = ({ card, onUpdate, onClose }) => {
                   onChange={(e) => setPlaybackRate(parseFloat(e.target.value))}
                   style={{ width: '100%' }}
                 />
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#6b7280' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--muted)' }}>
                   <span>0.5x</span>
                   <span>1.0x</span>
                   <span>2.0x</span>
